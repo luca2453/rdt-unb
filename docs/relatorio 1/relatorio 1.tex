@@ -1,0 +1,150 @@
+% ===========================================================================
+% MODELO DE RELATORIO  ·  ENE0046 Laboratorio de Eletronica  ·  2026/2
+%
+% Como usar
+%   1. Preencha o bloco IDENTIFICACAO logo abaixo.
+%   2. Deixe comentados os autores que nao existirem. Um autor fica centralizado,
+%      dois dividem a linha, tres ocupam tercos.
+%   3. Substitua o texto de cada secao pelo seu. As orientacoes que estao la
+%      dizem o que se espera em cada uma.
+%   4. Compile com pdflatex duas vezes, ou com latexmk -pdf.
+%
+% Estrutura
+%   Roteiro 1 nao tem bancada: use so a subsecao 4.1 e a 5.1, e compare o calculo
+%   analitico com a simulacao de projeto.
+%   Roteiros 2 a 7 usam a estrutura inteira.
+%
+% O arquivo estilo-relatorio.tex e a imagem logo-unb.png devem estar na mesma
+% pasta deste arquivo.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+\input{estilo-relatorio}
+
+% --------------------------- IDENTIFICACAO ---------------------------------
+\roteiro{1}{Stop-and-Wait (SAW)}
+\aturma{01}
+
+\autorum{Enzo Morrone de Azevedo Muniz}{221035442}
+\autordois{Luca Valderramos Cirino}{211066140}
+\autortres{Raul Myron Silva Amorim}{200049712}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+\capa
+
+\begin{resumo}
+Escreva este parágrafo por último, com 100 a 150 palavras. Diga o que você projetou, sob
+qual especificação, o que simulou ou mediu, o principal resultado numérico e a que
+conclusão chegou. Quem ler só este parágrafo deve saber o que você fez e o que encontrou.
+\end{resumo}
+
+\section{Introdução}
+
+Comece pelo problema, e não pelo circuito. Que necessidade de engenharia deu origem a esta
+topologia, onde você a encontraria em um equipamento real e o que aconteceria sem ela. Duas
+ou três referências ajudam aqui.
+
+Depois estreite o foco: que aspecto você vai investigar, sob quais condições, e por que
+vale a pena verificá-lo. Se o roteiro impõe alguma restrição de projeto que parece
+arbitrária, aproveite para explicar a razão dela.
+
+No último parágrafo, diga qual é o objetivo deste relatório e como o texto está
+organizado, seção a seção.
+
+\section{Implementação}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colocar Fluxograma ou máquina de estados do cliente implementado
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Resultados}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colocar Checksum MD5 do arquivo recebido para cada um dos três testes — é a confirmação de que o cliente rodou de verdade
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colocar Gráfico de throughput e RTT por segmento para pelo menos um dos arquivos
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colocar Tabela comparativa entre throughput teórico e medido para os três arquivos (small, medium, large)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Analise}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+colocar:
+Análise obrigatória no relatório:
+
+a) Por que o throughput do SAW é limitado pelo RTT? Explique com suas palavras, usando os dados coletados como evidência.
+
+b) Calcule o throughput teórico máximo usando a fórmula abaixo e compare com o throughput médio medido para cada arquivo:
+
+$Throughput_{max} = (segment\_size × 8) / RTT_{medio}$
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+comandos latex para figura, tabela e essas caixas
+
+\begin{figure}[H]
+\centering
+% \includegraphics[width=0.8\linewidth]{arquivo.png}
+\fbox{\parbox[c][3.2cm][c]{0.8\linewidth}{\centering\color{cinza}
+  substitua por \texttt{\textbackslash includegraphics}}}
+\caption{Legenda descritiva. Diga o que a figura mostra e o que nela é relevante, e não
+apenas o nome do circuito.}
+\label{fig:exemplo}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Grandeza} & \textbf{Projeto} & \textbf{Sim. montagem} & \textbf{Medido} &
+\textbf{Erro} \\
+\midrule
+& & & & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}{Três comparações, três causas diferentes}
+
+\smallskip
+\textbf{Cálculo analítico contra simulação de projeto.} A conta está certa? Se aqui houver
+diferença, procure na álgebra ou no esquemático.
+
+\smallskip
+\textbf{Simulação de projeto contra simulação da montagem.} Quanto custou a tolerância dos
+componentes? A diferença aqui é a distância entre o valor nominal e o valor real da peça
+que vocês pegaram.
+
+\smallskip
+\textbf{Simulação da montagem contra medição.} O modelo descreve o circuito real? Diferença
+aqui aponta algo que o modelo não representa, como a resistência série do indutor, a
+impedância da ponta de prova ou a banda do instrumento.
+\end{nota}
+
+\begin{espec}{azul}
+
+\smallskip
+\textbf{Cálculo analítico contra simulação de projeto.} A conta está certa? Se aqui houver
+diferença, procure na álgebra ou no esquemático.
+
+\end{espec}
+
+\section{Conclusão}
+
+Retome o objetivo que vocês anunciaram na introdução e responda se ele foi atingido,
+apoiando a resposta em um número. Aponte a principal limitação do que foi feito e o que
+ela impede de afirmar. Evite trazer resultado novo nesta seção.
+
+\section{Referências}
+
+\begin{referencias}
+\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+
+\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\end{referencias}
+
+\end{document}
