@@ -1,9 +1,6 @@
+import sys
 import socket
 import time
-
-SERVIDOR = "137.131.178.229"
-PORTA    = 8080
-GRUPO    = "grupo12"
 
 def criar_socket(timeout=5.0):
     # cria e configura o socket UDP
@@ -31,23 +28,22 @@ def ping(sock, servidor):
     
     return rtt, tempo_servidor
 
-def hello(sock: socket.socket, servidor: tuple, grupo: str):
-    # envia HELLO, parseia OK, retorna dict com os campos
-    pacote = f"HELLO|grupo={grupo}|segment_size=512|file=small"
+def hello(sock: socket.socket, servidor: tuple, grupo: str, arquivo: str, segment_size_proposto: int = 512):
+    # Envia HELLO dinâmico, parseia OK, retorna dict com os campos
+    pacote = f"HELLO|grupo={grupo}|segment_size={segment_size_proposto}|file={arquivo}"
     sock.sendto(pacote.encode("utf-8"), servidor)
     
     try:
         dados, _ = sock.recvfrom(65507)
     except socket.timeout:
-        print("Erro: O servidor demorou a responder (Timeout).")
+        print("Erro: O servidor demorou a responder no HELLO (Timeout).")
         return {}
     
     resposta = dados.decode("utf-8")
     
     campos = {}
-    
     for campo in resposta.split("|")[1:]:
-        chave, valor = campo.split("=",1)
+        chave, valor = campo.split("=", 1)
         campos[chave] = valor
     
     return campos
@@ -73,45 +69,61 @@ def requisitar_segmento(sock: socket.socket, servidor: tuple, seq: int=0):
     
 
 def main():
+    # 1. Leitura manual dos argumentos com sys.argv
+    if len(sys.argv) < 7:
+        print("Uso correto: python3 client.py --server <IP> --group <grupo> --file <arquivo>")
+        return
+
+    servidor_ip = ""
+    grupo = ""
+    arquivo = ""
+
+    # Captura argumentos
+    for i in range(1, len(sys.argv)):
+        if sys.argv[i] == "--server" and i + 1 < len(sys.argv):
+            servidor_ip = sys.argv[i + 1]
+        elif sys.argv[i] == "--group" and i + 1 < len(sys.argv):
+            grupo = sys.argv[i + 1]
+        elif sys.argv[i] == "--file" and i + 1 < len(sys.argv):
+            arquivo = sys.argv[i + 1]
+
+    if not servidor_ip or not grupo or not arquivo:
+        print("Erro: Faltam argumentos obrigatórios (--server, --group, --file).")
+        return
+
     sock = criar_socket()
-    servidor = (SERVIDOR, PORTA)
+    servidor = (servidor_ip, 8080)
     
+    print("=== Tarefa 1 — SAW RDT-UnB ===")
+    print(f"Servidor alvo: {servidor_ip}:8080")
+    print(f"Arquivo alvo: {arquivo}\n")
 
-    print("=== Tarefa 0 — RDT-UnB Explorer ===")
-    print(f"Servidor: {SERVIDOR}:{PORTA}")
-    print()
-
-    # Passo 1 — PING
+    # Passo 1 — PING 
     rtt, tempo_servidor = ping(sock, servidor)
     print(f"[1] PING")
     print(f"    RTT: {rtt:.2f} ms\n")
 
     # Passo 2 — HELLO
     print(f"[2] HELLO")
-    retorno = hello(sock, servidor, GRUPO)
+    seg_size_proposto = 512
+    
+    retorno = hello(sock, servidor, grupo, arquivo, seg_size_proposto)
     
     if not retorno:
         print("    [!] Erro de timeout no HELLO! Encerrando conexão.")
         return
     
-    print(f"    Arquivo:         small ({retorno['file_size']} bytes = {int(retorno['file_size'])//1024} KB)")
-    print(f"    Checksum MD5:    {retorno['checksum']}")
-    print(f"    Total segmentos: {retorno['total_segments']}")
-    print(f"    Tamanho segmento: {retorno['segment_size']} bytes\n")
+    # Negociacao concluida
+    segment_size_oficial = int(retorno['segment_size'])
+    total_segments = int(retorno['total_segments'])
+    file_size = int(retorno['file_size'])
+    checksum_esperado = retorno['checksum']
     
-
-    # Passo 3 — REQ
-    print("[3] REQ seg=0")
-    payload = requisitar_segmento(sock, servidor, 0)
+    print(f"    Arquivo:         {arquivo} ({file_size} bytes = {file_size//1024} KB)")
+    print(f"    Checksum MD5:    {checksum_esperado}")
+    print(f"    Total segmentos: {total_segments}")
+    print(f"    Tamanho negociado: {segment_size_oficial} bytes (Proposto: {seg_size_proposto})\n")
     
-    if not payload:
-        print("    [!] Falha ao receber o segmento. Encerrando conexão.")
-        return
-        
-    primeiros = payload[:8]
-    print(f"    Payload recebido: {len(payload)} bytes")
-    hex_str = " ".join(f"{b:02x}" for b in primeiros)
-    print(f"    Primeiros 8 bytes: {hex_str}")
-
+    
 if __name__ == "__main__":
     main()
