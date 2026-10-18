@@ -40,16 +40,25 @@ conclusão chegou. Quem ler só este parágrafo deve saber o que você fez e o q
 
 \section{Introdução}
 
-Comece pelo problema, e não pelo circuito. Que necessidade de engenharia deu origem a esta
-topologia, onde você a encontraria em um equipamento real e o que aconteceria sem ela. Duas
-ou três referências ajudam aqui.
+Com a expanção da internet para além dos PCs, se tornou necessário desenvolver aplicações com tempo de resposta mínimo.
+Isso deve-se ao celular, hoje o principal meio de se conectar na internet, que exige protocolos rápidos - devido as exigências dos usuários -
+e confiáveis - devido a perda de pacotes esperada das comunicações sem fio.
 
-Depois estreite o foco: que aspecto você vai investigar, sob quais condições, e por que
-vale a pena verificá-lo. Se o roteiro impõe alguma restrição de projeto que parece
-arbitrária, aproveite para explicar a razão dela.
+Dessa forma, um pode pensar que o protocolo TCP é ideal, porém, devido a perda de pacotes, o mecanismo de confirmar pacotes com ACK
+pode cause retransimições excessivas, diminuindo a largura de banda da comunicação. Já o UDP também não é ideal, visto que não garante
+a comunicação confiável, apesar de permitir uma largura de banda melhor.
 
-No último parágrafo, diga qual é o objetivo deste relatório e como o texto está
-organizado, seção a seção.
+Assim, este relatório é parte 1 de 3, visando criar um novo protocolo que mistura os pontos fortes do UDP e TCP afim de obter
+o melhor dos dois mundos - confiável e rápido. Neste relatório 1, usando o UDP como base, é implementado uma forma básica de 
+comunicação confiável chamada \textit{Stop-and-Wait (SAW)}.
+
+No \textit{Stop-and-Wait}, aquele que envia os pacotes, envia apenas um de cada vez, seguindo para o próximo apenas após receber um ACK.
+Caso ocorra um timeout, o pacote é retransmitido até que se receba o respectivo ACK. Devido ao fato de que a maior parte do tempo é 
+gasta esperando um ACK, o SAW não possui largura de banda boa, mas é uma forma fácil de implmentar comunicação confiável.
+
+Este relatório está dividido em 3 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
+nos resultados, tem-se a verificação da confiábilidade e dados de throughput e RTT da transimição; e por último na análise, os dados
+dos resultados são comentádos.
 
 \section{Implementação}
 
