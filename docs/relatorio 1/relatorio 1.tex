@@ -80,81 +80,47 @@ colocar Gráfico de throughput e RTT por segmento para pelo menos um dos arquivo
 \centering
 \includegraphics[width=0.8\linewidth]{grafico_rtt_small.png}
 	\caption{Gráfico de RTT em millisegundos. Para melhor visualazação, está exibido uma média móvel simples de tamanho 50 dos valores reais.}
-\label{fig:exemplo}
+\label{fig:graf_rtt}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.8\linewidth]{grafico_thoughput_small.png}
 \caption{Gráfico de throughput em kilobytes/segundo. Para melhor visualazação, está exibido uma média móvel simples de tamanho 50 dos valores reais.}
-\label{fig:exemplo}
+\label{fig:graf_thoughput}
 \end{figure}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-colocar Tabela comparativa entre throughput teórico e medido para os três arquivos (small, medium, large)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\section{Analise}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-colocar:
-Análise obrigatória no relatório:
-
-a) Por que o throughput do SAW é limitado pelo RTT? Explique com suas palavras, usando os dados coletados como evidência.
-
-b) Calcule o throughput teórico máximo usando a fórmula abaixo e compare com o throughput médio medido para cada arquivo:
-
-$Throughput_{max} = (segment\_size × 8) / RTT_{medio}$
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-comandos latex para figura, tabela e essas caixas
-
-\begin{figure}[H]
-\centering
-% \includegraphics[width=0.8\linewidth]{arquivo.png}
-\fbox{\parbox[c][3.2cm][c]{0.8\linewidth}{\centering\color{cinza}
-  substitua por \texttt{\textbackslash includegraphics}}}
-\caption{Legenda descritiva. Diga o que a figura mostra e o que nela é relevante, e não
-apenas o nome do circuito.}
-\label{fig:exemplo}
-\end{figure}
-
+\begin{table}
 \begin{center}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Grandeza} & \textbf{Projeto} & \textbf{Sim. montagem} & \textbf{Medido} &
-\textbf{Erro} \\
+\textbf{Arquivo} & \textbf{RTT médio} & \textbf{throughput max teórico} & \textbf{throughput medido} \\
 \midrule
-& & & & \\
+	small  & $\SI{}{\milli\second}$ & $\SI{}{\kilo\bit\per\second}$ & $\SI{}{\kilo\bit\per\second}$ \\
+	medium & $\SI{}{\milli\second}$ & $\SI{}{\kilo\bit\per\second}$ & $\SI{}{\kilo\bit\per\second}$ \\
+	large  & $\SI{}{\milli\second}$ & $\SI{}{\kilo\bit\per\second}$ & $\SI{}{\kilo\bit\per\second}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
+\caption{throughput teórico com base no rtt medido}
+	\label{tab:throughput}
+\end{table}
 
-\begin{nota}{Três comparações, três causas diferentes}
+\section{Analise}
 
-\smallskip
-\textbf{Cálculo analítico contra simulação de projeto.} A conta está certa? Se aqui houver
-diferença, procure na álgebra ou no esquemático.
+Um ponto imporante da técnica SAW é que seu throughput é limitado pelo round trip time (RTT). Isso é evidênciado nos gráficos obtidos.
+Quando o RTT aumenta, imediatamente o throughput diminui. O inverso acontece quando o RTT diminui. Isso acontece, pois, para trasmitir
+o próximo segmento, o cliente deve esperar o atual chegar. Dessa forma, o atraso para chegar o primeiro pacote, atrasa todos os pacotes
+seguintes.
 
-\smallskip
-\textbf{Simulação de projeto contra simulação da montagem.} Quanto custou a tolerância dos
-componentes? A diferença aqui é a distância entre o valor nominal e o valor real da peça
-que vocês pegaram.
+Além disso, o tamanho do segmento, que é relativamente pequeno, também não contribui. A quantidade de segmentos necessária para a transimição é
+diretamente proporcial ao tamanho do segmento, assim, se o tamanho for pequeno, a quantidade de segmentos será grande, e o atraso devido a espera
+do RTT também será grande. É possivel derivar uma fórmula para obter o throughput teórioco máximo desse método dado o RTT:
 
-\smallskip
-\textbf{Simulação da montagem contra medição.} O modelo descreve o circuito real? Diferença
-aqui aponta algo que o modelo não representa, como a resistência série do indutor, a
-impedância da ponta de prova ou a banda do instrumento.
-\end{nota}
+$$Throughput_{max} = (segment\_size × 8) / RTT_{medio}$$
 
-\begin{espec}{azul}
-
-\smallskip
-\textbf{Cálculo analítico contra simulação de projeto.} A conta está certa? Se aqui houver
-diferença, procure na álgebra ou no esquemático.
-
-\end{espec}
+Com essa fórmula, na tabela \ref{tab:throughput}, é possível observar que o valor teórico máximo não é tão distante do valor real, apesar de um pouco maior.
+Isso se deve ao fato de que o RTT não considera atrasos de processamento do cliente, apenas quanto tempo demorou o servidor para responder.
 
 \section{Conclusão}
 
