@@ -120,14 +120,16 @@ do RTT também será grande. É possivel derivar uma fórmula para obter o throu
 
 $$Throughput_{max} = (segment\_size × 8) / RTT_{medio}$$
 
-Com essa fórmula, na tabela \ref{tab:throughput}, é possível observar que o valor teórico máximo não é tão distante do valor real, apesar de um pouco maior.
+Com essa fórmula, teoricamente, um RTT médio de $\SI{10}{\milli\second}$ deveria obter um throughput de $\SI{409,6}{\kilo\bit\per\second}$,
+mas isso é difícil de observar na prática. Na tabela \ref{tab:throughput}, tem-se dados experimentais, e é possível observar que
+o valor teórico máximo não é tão distante do valor real, apesar de um pouco maior.
 Isso se deve ao fato de que o RTT não considera atrasos de processamento do cliente, apenas quanto tempo demorou o servidor para responder.
 
 \section{Conclusão}
 
-Retome o objetivo que vocês anunciaram na introdução e responda se ele foi atingido,
-apoiando a resposta em um número. Aponte a principal limitação do que foi feito e o que
-ela impede de afirmar. Evite trazer resultado novo nesta seção.
+Assim, este relatório concluíu o objetivo de implmentar um protocolo de comunicação \textit{Stop-and-Wait}. Mostrou-se que ele consegue a trasmição confiável,
+com uma taxa de transimição teórica de $\SI{409,6}{\kilo\bit\per\second}$ com um RTT médio de $\SI{10}{\milli\second}$.
+Apesar disso, devido ao fato do servidor de testes provido pelo professor estar fora do ar durante o experimento, as conclusões feitas podem não condizer com as esperadas.
 
 \section{Referências}
 
