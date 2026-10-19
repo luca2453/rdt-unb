@@ -52,9 +52,10 @@ Assim, este relatório é parte 1 de 3, visando criar um novo protocolo que mist
 o melhor dos dois mundos - confiável e rápido. Neste relatório 1, usando o UDP como base, é implementado uma forma básica de 
 comunicação confiável chamada \textit{Stop-and-Wait (SAW)}.
 
-No \textit{Stop-and-Wait}, aquele que envia os pacotes, envia apenas um de cada vez, seguindo para o próximo apenas após receber um ACK.
-Caso ocorra um timeout, o pacote é retransmitido até que se receba o respectivo ACK. Devido ao fato de que a maior parte do tempo é 
-gasta esperando um ACK, o SAW não possui largura de banda boa, mas é uma forma fácil de implmentar comunicação confiável.
+No \textit{Stop-and-Wait}, o cliente pede um pacote de cada vez, espera e apenas solicita o próximo depois de recebido o pacote com sucesso.
+Caso ocorra um timeout, o pacote é retransmitido até que se receba os dados solicitados.
+O cliente, após receber cada pacote, confirma para o servidor enviando uma mensagem de ACK. Devido ao fato de que a maior parte do tempo é 
+gasta esperando um pacote individuál, o SAW não possui largura de banda boa, mas é uma forma fácil de implmentar comunicação confiável.
 
 Este relatório está dividido em 3 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
 nos resultados, tem-se a verificação da confiábilidade e dados de throughput e RTT da transimição; e por último na análise, os dados
