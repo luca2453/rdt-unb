@@ -1,6 +1,7 @@
 # python3 client.py --server 137.131.178.229 --group grupo12 --file small
 
-import sys
+import argparse
+import csv
 import socket
 import time
 import hashlib
@@ -78,27 +79,17 @@ def requisitar_segmento(sock: socket.socket, servidor: tuple, seq: int=0):
     
 
 def main():
-    # 1. Leitura manual dos argumentos com sys.argv
-    if len(sys.argv) < 7:
-        print("Uso correto: python3 client.py --server <IP> --group <grupo> --file <arquivo>")
-        return
+    # 1. Leitura dos argumentos de linha de comando (argparse)
+    parser = argparse.ArgumentParser(description="Cliente Stop-and-Wait (SAW) - RDT-UnB")
+    parser.add_argument("--server", required=True, help="IP do servidor RDT-UnB")
+    parser.add_argument("--group", required=True, help="Nome do grupo (campo grupo= do HELLO)")
+    parser.add_argument("--file", required=True, choices=["small", "medium", "large"],
+                        help="Arquivo a ser recebido")
+    args = parser.parse_args()  # sem --group, o argparse aborta com erro
 
-    servidor_ip = ""
-    grupo = ""
-    arquivo = ""
-
-    # Captura argumentos
-    for i in range(1, len(sys.argv)):
-        if sys.argv[i] == "--server" and i + 1 < len(sys.argv):
-            servidor_ip = sys.argv[i + 1]
-        elif sys.argv[i] == "--group" and i + 1 < len(sys.argv):
-            grupo = sys.argv[i + 1]
-        elif sys.argv[i] == "--file" and i + 1 < len(sys.argv):
-            arquivo = sys.argv[i + 1]
-
-    if not servidor_ip or not grupo or not arquivo:
-        print("Erro: Faltam argumentos obrigatórios (--server, --group, --file).")
-        return
+    servidor_ip = args.server
+    grupo = args.group
+    arquivo = args.file
 
     sock = criar_socket(timeout=0.5)
     servidor = (servidor_ip, 8080)
@@ -139,33 +130,29 @@ def main():
     arquivo_final = bytearray()
     total_retransmissoes = 0
     inicio_transferencia = time.time()
-
-    dados = open("dados.csv", "w")
-    lista_thoughput = []
-    lista_rtt = []
-    lista_seq = []
-    dados.write("RTT_ms, throughput_kbps, retransmissoes, timeout_ocorrido_ms\n")
+    
+    metricas = []  # uma linha por segmento para o CSV
 
     for seq in range(total_segments):
-        lista_seq.append(seq)
-        seq_inicio_transmicao = time.time()
-        seq_timeout_occorrido = 0
-        seq_retransmissoes = 0
+        retx_seg = 0
         while True:
-            # 1. Envia REQ e aguarda o pacote DATA
-            seq_inicio = time.time()
+            # 1. Envia REQ e aguarda o pacote DATA (RTT medido nesta tentativa)
+            t0 = time.perf_counter()
             payload = requisitar_segmento(sock, servidor, seq)
+            rtt_seg = (time.perf_counter() - t0) * 1000  # ms
             
             if payload:
+                throughput_seg = (len(payload) * 8 / 1000) / (rtt_seg / 1000)  # kbps
+                metricas.append({
+                    "seq": seq,
+                    "rtt_ms": round(rtt_seg, 3),
+                    "throughput_kbps": round(throughput_seg, 3),
+                    "retransmissoes": retx_seg,
+                    "timeout_ocorrido": int(retx_seg > 0),
+                    "payload_bytes": len(payload),
+                    "t_fim_s": round(time.time() - inicio_transferencia, 6),
+                })
                 # 2. Recebeu com sucesso
-                seq_rtt = (time.time() - seq_inicio)
-                seq_tempo_total = seq_rtt + seq_timeout_occorrido
-                seq_throughput = (segment_size_oficial / seq_tempo_total)
-                dados.write(f"{seq_rtt*1000}, {seq_throughput/1000}, {seq_retransmissoes}, {seq_timeout_occorrido*1000}\n")
-
-                lista_rtt.append(seq_rtt*1000)
-                lista_thoughput.append(seq_throughput/1000)
-
                 arquivo_final.extend(payload)
                 
                 # 3. Envia ACK
@@ -179,24 +166,39 @@ def main():
                 break 
                 
             else:
-                # O timeout estourou. Registra a retransmissão global e tenta de novo silenciosamente
+                # O timeout estourou. Registra a retransmissão e tenta de novo
                 total_retransmissoes += 1
-                seq_retransmissoes += 1
-                seq_timeout_occorrido = time.time() - seq_inicio_transmicao
-
+                retx_seg += 1
 
     tempo_total = time.time() - inicio_transferencia
 
-    dados.close()
+    # Salva métricas por segmento em CSV
+    nome_csv = f"metricas_{grupo}_{arquivo}.csv"
+    with open(nome_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(metricas[0].keys()))
+        w.writeheader()
+        w.writerows(metricas)
+    rtt_medio = sum(m["rtt_ms"] for m in metricas) / len(metricas)
+    teorico_kbps = (segment_size_oficial * 8 / 1000) / (rtt_medio / 1000)
+    print(f"\n    CSV salvo em: {nome_csv}")
 
     # Passo 4 - Validação de Integridade
     print("\n[4] Verificando integridade...")
     md5_calculado = hashlib.md5(arquivo_final).hexdigest()
     
+    print(f"    MD5 esperado:  {checksum_esperado}")
+    print(f"    MD5 calculado: {md5_calculado}")
+
     if md5_calculado == checksum_esperado:
         status_md5 = "SUCESSO (Sem corrupção)"
     else:
         status_md5 = "ERRO (Checksum não coincide)"
+
+    # Salva o arquivo recebido em disco (evidência da transferência)
+    nome_saida = f"recebido_{grupo}_{arquivo}.bin"
+    with open(nome_saida, "wb") as f:
+        f.write(arquivo_final)
+    print(f"    Arquivo salvo em: {nome_saida}")
         
     # Passo 5 - Relatório Final
     # Calcula o throughput em kbps (kilobits por segundo)
@@ -209,7 +211,10 @@ def main():
     print(f" Tamanho total:     {len(arquivo_final)} bytes")
     print(f" Tempo decorrido:   {tempo_total:.2f} segundos")
     print(f" Throughput médio:  {throughput_kbps:.2f} kbps")
+    print(f" RTT médio:         {rtt_medio:.2f} ms")
+    print(f" Throughput teórico:{teorico_kbps:.2f} kbps  (segment_size*8/RTT_medio)")
     print(f" Retransmissões:    {total_retransmissoes} pacotes perdidos")
+    print(f" MD5 calculado:     {md5_calculado}")
     print(f" Integridade (MD5): {status_md5}")
     print("="*45 + "\n")
     
