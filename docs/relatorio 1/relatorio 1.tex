@@ -33,9 +33,13 @@
 \capa
 
 \begin{resumo}
-Escreva este parágrafo por último, com 100 a 150 palavras. Diga o que você projetou, sob
-qual especificação, o que simulou ou mediu, o principal resultado numérico e a que
-conclusão chegou. Quem ler só este parágrafo deve saber o que você fez e o que encontrou.
+	Este relatório apresenta a implementação e a avaliação de um protocolo de comunicação confiável baseado no mecanismo Stop-and-Wait (SAW), 
+	utilizando o UDP como base. 
+	O protocolo implementado permite a transferência de dados por segmentos, com confirmação de recebimento por mensagens ACK e retransmissão em caso de timeout. 
+	Foram realizados testes com arquivos de diferentes tamanhos, analisando o tempo de ida e volta (Round-Trip Time, RTT) e a taxa de transferência (throughput). 
+	Os resultados obtidos apresentaram RTT médio entre 13,05 e 13,56 ms e throughput medido entre 300,87 e 312,55 kbit/s, valores próximos aos limites teóricos calculados. 
+	Os testes foram realizados com um servidor desenvolvido pelos autores, pois o servidor disponibilizado para a atividade estava indisponível. 
+	Os resultados evidenciam a influência do RTT no desempenho do protocolo.
 \end{resumo}
 
 \section{Introdução}
