@@ -139,14 +139,33 @@ def main():
     arquivo_final = bytearray()
     total_retransmissoes = 0
     inicio_transferencia = time.time()
-    
+
+    dados = open("dados.csv", "w")
+    lista_thoughput = []
+    lista_rtt = []
+    lista_seq = []
+    dados.write("RTT_ms, throughput_kbps, retransmissoes, timeout_ocorrido_ms\n")
+
     for seq in range(total_segments):
+        lista_seq.append(seq)
+        seq_inicio_transmicao = time.time()
+        seq_timeout_occorrido = 0
+        seq_retransmissoes = 0
         while True:
             # 1. Envia REQ e aguarda o pacote DATA
+            seq_inicio = time.time()
             payload = requisitar_segmento(sock, servidor, seq)
             
             if payload:
                 # 2. Recebeu com sucesso
+                seq_rtt = (time.time() - seq_inicio)
+                seq_tempo_total = seq_rtt + seq_timeout_occorrido
+                seq_throughput = (segment_size_oficial / seq_tempo_total)
+                dados.write(f"{seq_rtt*1000}, {seq_throughput/1000}, {seq_retransmissoes}, {seq_timeout_occorrido*1000}\n")
+
+                lista_rtt.append(seq_rtt*1000)
+                lista_thoughput.append(seq_throughput/1000)
+
                 arquivo_final.extend(payload)
                 
                 # 3. Envia ACK
@@ -162,8 +181,13 @@ def main():
             else:
                 # O timeout estourou. Registra a retransmissão global e tenta de novo silenciosamente
                 total_retransmissoes += 1
+                seq_retransmissoes += 1
+                seq_timeout_occorrido = time.time() - seq_inicio_transmicao
+
 
     tempo_total = time.time() - inicio_transferencia
+
+    dados.close()
 
     # Passo 4 - Validação de Integridade
     print("\n[4] Verificando integridade...")
