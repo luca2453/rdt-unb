@@ -40,10 +40,10 @@ gbn16:
 	$(MAKE) gbn WINDOW=16
 
 test:
-	$(PYTHON) client_teste.py
+	$(PYTHON) rdt_diagnostico.py
 
 syntax:
-	$(PYTHON) -m py_compile client.py client_teste.py graficos.py
+	$(PYTHON) -m py_compile client.py rdt_diagnostico.py graficos.py
 
 check: syntax
 	git diff --check
