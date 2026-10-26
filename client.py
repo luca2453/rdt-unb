@@ -212,7 +212,7 @@ def transferir_gbn(
     arquivo_final = bytearray()
     for seq in range(total_segments):
         arquivo_final.extend(payloads[seq])
-    metricas = []
+    metricas: list[MetricaSegmento] = []
     for seq in range(total_segments):
         payload = payloads[seq]
         rtt_seg = rtt_por_segmento[seq]
@@ -234,6 +234,123 @@ def transferir_gbn(
     sock.settimeout(SOCKET_TIMEOUT_SECONDS)
     return arquivo_final, metricas, total_retransmissoes
 
+def transferir_sv(
+    sock: socket.socket,
+    servidor: tuple[str, int],
+    total_segments: int,
+    window_size: int,
+) -> tuple[bytearray, list[MetricaSegmento], int]:
+    base = 0
+    payloads: dict[int, bytes] = {}
+    retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
+    rtt_por_segmento: dict[int, float] = {}
+    recebido_em: dict[int, str] = {}
+    enviado_uma_vez: set[int] = set()
+    total_retransmissoes = 0
+
+    enviados_em: dict[int, float] = {}
+
+    def send_new():
+        nonlocal total_retransmissoes
+        assert(base < total_segments)
+        for new_seq in range(base, total_segments):
+            if new_seq not in payloads:
+                if new_seq in enviado_uma_vez:
+                    retransmissoes_por_segmento[new_seq] += 1
+                    total_retransmissoes += 1
+                sock.sendto(f"REQ|seq={new_seq}".encode("utf-8"), servidor)
+                enviados_em[new_seq] = time.perf_counter()
+                enviado_uma_vez.add(new_seq)
+                if len(enviados_em) == window_size:
+                    break
+    
+    def send_all_new():
+        remaining = total_segments - base - len(enviados_em)
+        while len(enviados_em) < window_size and remaining > 0:
+            send_new()
+
+
+
+    while base < total_segments:
+        send_all_new()
+
+        # receber
+        oldest_transmition_seq = next(iter(enviados_em))
+        oldest_transmition = next(iter(enviados_em.values()))
+        for key in enviados_em:
+            if enviados_em[key] < oldest_transmition:
+                oldest_transmition = enviados_em[key]
+                oldest_transmition_seq = key
+
+
+        prazo = oldest_transmition + SOCKET_TIMEOUT_SECONDS
+
+        restante = prazo - time.perf_counter()
+        sock.settimeout(max(restante, 0.001))
+        try:
+            dados, _ = sock.recvfrom(65507)
+        except socket.timeout:
+            retransmissoes_por_segmento[oldest_transmition_seq] += 1
+            total_retransmissoes += 1
+            print(f"seq {oldest_transmition_seq} timeout\n")
+
+            sock.sendto(f"REQ|seq={oldest_transmition_seq}".encode("utf-8"), servidor)
+            enviados_em[oldest_transmition_seq] = time.perf_counter()
+            enviado_uma_vez.add(oldest_transmition_seq)
+            continue
+
+        data = receber_data(dados)
+        if data is None:
+            continue
+        seq, payload = data
+        if seq < base:
+            continue
+
+        if seq not in payloads:
+            payloads[seq] = payload
+            rtt_por_segmento[seq] = (
+                time.perf_counter() - enviados_em.get(seq, time.perf_counter())
+            ) * 1000
+            recebido_em[seq] = datetime.now().astimezone().isoformat(
+                timespec="milliseconds"
+            )
+            # Reconfirma duplicatas para que o servidor possa descartar
+            # retransmissões sem perder o ACK correspondente.
+            sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
+
+            enviados_em.pop(seq, None)
+            while True:
+                if base in payloads.keys():
+                    base = base + 1
+                else:
+                    break
+
+    arquivo_final = bytearray()
+    for seq in range(total_segments):
+        arquivo_final.extend(payloads[seq])
+    metricas: list[MetricaSegmento] = []
+    for seq in range(total_segments):
+        payload = payloads[seq]
+        rtt_seg = rtt_por_segmento[seq]
+        metricas.append({
+            "segment": seq,
+            "timestamp": recebido_em[seq],
+            "size_bytes": len(payload),
+            "rtt_ms": round(rtt_seg, 3),
+            "rtt_estimated_ms": "",
+            "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+            "throughput_kbps": round(
+                len(payload) * 8 / rtt_seg if rtt_seg else 0.0, 3
+            ),
+            "retransmissions": retransmissoes_por_segmento[seq],
+            "timeout_occurred": int(retransmissoes_por_segmento[seq] > 0),
+            "window_size": window_size,
+            "protocol": "gbn",
+        })
+    sock.settimeout(SOCKET_TIMEOUT_SECONDS)
+
+    return arquivo_final, metricas, total_retransmissoes
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Cliente RDT-UnB")
@@ -244,7 +361,7 @@ def main() -> int:
         help="Arquivo a ser recebido",
     )
     parser.add_argument(
-        "--protocol", choices=["saw", "gbn"], default="saw",
+        "--protocol", choices=["saw", "gbn", "sv"], default="saw",
         help="Protocolo de transferência (padrão: saw)",
     )
     parser.add_argument(
@@ -298,6 +415,15 @@ def main() -> int:
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
                 sock, servidor, total_segments, args.window_size
             )
+        elif args.protocol == "sv":
+            print(
+                f"[3] Iniciando transferência Selective Repeat "
+                f"({total_segments} segmentos, janela {args.window_size})..."
+            )
+            arquivo_final, metricas, total_retransmissoes = transferir_sv(
+                sock, servidor, total_segments, args.window_size
+            )
+
         else:
             print(
                 f"[3] Iniciando transferência Stop-and-Wait "
