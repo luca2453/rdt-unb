@@ -10,7 +10,6 @@ from typing import TypedDict
 
 SERVER_PORT = 8080
 SOCKET_TIMEOUT_SECONDS = 0.5
-MAX_FIN_ATTEMPTS = 3
 
 
 class MetricaSegmento(TypedDict):
@@ -236,39 +235,6 @@ def transferir_gbn(
     return arquivo_final, metricas, total_retransmissoes
 
 
-def enviar_fin(
-    sock: socket.socket, servidor: tuple[str, int], checksum: str
-) -> bool:
-    pacote = f"FIN|checksum={checksum}".encode("utf-8")
-    for tentativa in range(1, MAX_FIN_ATTEMPTS + 1):
-        sock.sendto(pacote, servidor)
-        prazo = time.perf_counter() + SOCKET_TIMEOUT_SECONDS
-        while time.perf_counter() < prazo:
-            sock.settimeout(max(prazo - time.perf_counter(), 0.001))
-            try:
-                dados, _ = sock.recvfrom(65507)
-            except socket.timeout:
-                break
-            if receber_data(dados) is not None:
-                continue
-            try:
-                tipo, campos = parsear_campos(dados)
-            except (UnicodeDecodeError, ValueError):
-                continue
-
-            if tipo != "DONE" or campos.get("ok") not in {"0", "1"}:
-                print(f"Erro: resposta inválida ao FIN: {tipo}.")
-                return False
-            if campos["ok"] == "1":
-                return True
-            print("Erro: o servidor rejeitou o checksum (DONE|ok=0).")
-            return False
-        print(f"    FIN sem resposta (tentativa {tentativa}/{MAX_FIN_ATTEMPTS}).")
-
-    print("Erro: o servidor não confirmou o encerramento da sessão.")
-    return False
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Cliente RDT-UnB")
     parser.add_argument("--server", required=True, help="IP ou hostname do servidor")
@@ -386,10 +352,8 @@ def main() -> int:
             print("    [!] O arquivo recebido está corrompido.")
             return 1
 
-        print("\n[5] Encerrando sessão (FIN/DONE)...")
-        if not enviar_fin(sock, servidor, md5_calculado):
-            return 1
-        print("    Servidor confirmou a integridade (DONE|ok=1).")
+        print("\n[5] Encerrando sessão...")
+        print("    Integridade confirmada localmente (MD5).")
 
         timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
         nome_csv = f"metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"

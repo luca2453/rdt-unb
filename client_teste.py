@@ -31,5 +31,12 @@ s.sendto(b'REQ|seq=1', srv)
 data2 = s.recvfrom(65507)[0]
 print('DATA seq=1:', len(data2), 'bytes')
 
+# Confirma o segundo segmento antes de testar o encerramento.
+s.sendto(b'ACK|seq=1', srv)
+
+s.sendto(b'FIN|checksum=f5adc7ebd10d3997cfa18c8a73a7f9', srv)
+resposta_fin = s.recvfrom(65507)[0]
+print('FIN recebido:', repr(resposta_fin))
+
 print('Servidor OK')
 s.close()
