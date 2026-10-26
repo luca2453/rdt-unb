@@ -254,10 +254,14 @@ def transferir_sv(
         nonlocal total_retransmissoes
         assert(base < total_segments)
         for new_seq in range(base, total_segments):
-            if new_seq not in payloads:
+            if new_seq not in payloads and new_seq not in enviados_em:
                 if new_seq in enviado_uma_vez:
                     retransmissoes_por_segmento[new_seq] += 1
                     total_retransmissoes += 1
+                    #print(f"pedindo seq {new_seq} de novo")
+                else:
+                    #print(f"pedindo seq {new_seq}")
+                    pass
                 sock.sendto(f"REQ|seq={new_seq}".encode("utf-8"), servidor)
                 enviados_em[new_seq] = time.perf_counter()
                 enviado_uma_vez.add(new_seq)
