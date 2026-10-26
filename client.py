@@ -499,11 +499,24 @@ def main() -> int:
 
         rtt_medio = sum(float(m["rtt_ms"]) for m in metricas) / len(metricas)
         throughput_kbps = len(arquivo_final) * 8 / 1000 / tempo_total
-        teorico_kbps = segment_size_oficial * 8 / rtt_medio
+        teorico_kbps: float
+
+        if args.protocol == "gbn":
+            teorico_kbps= args.window_size*(segment_size_oficial * 8) / rtt_medio
+        elif args.protocol == "sv":
+            teorico_kbps= args.window_size*(segment_size_oficial * 8) / rtt_medio
+        else:
+            teorico_kbps= segment_size_oficial * 8 / rtt_medio
+
+
         print(f"\n    CSV salvo em: {nome_csv}")
         print(f"    Arquivo salvo em: {nome_saida}")
         print("\n" + "=" * 45)
-        nome_protocolo = "GO-BACK-N" if args.protocol == "gbn" else "STOP-AND-WAIT"
+        nome_protocolo = "STOP-AND-WAIT"
+        if args.protocol == "gbn":
+            nome_protocolo = "GO-BACK-N"
+        elif args.protocol == "sv":
+            nome_protocolo = "SELECTIVE-REPEAT"
         print(f" RELATÓRIO DA TRANSFERÊNCIA ({nome_protocolo})")
         print("=" * 45)
         print(f" Arquivo recebido:  {args.file}")
@@ -511,7 +524,14 @@ def main() -> int:
         print(f" Tempo decorrido:   {tempo_total:.2f} segundos")
         print(f" Throughput médio:  {throughput_kbps:.2f} kbps")
         print(f" RTT médio:         {rtt_medio:.2f} ms")
-        print(f" Throughput teórico: {teorico_kbps:.2f} kbps (segment_size*8/RTT)")
+        
+        if args.protocol == "gbn":
+            print(f" Throughput teórico: {teorico_kbps:.2f} kbps window_size*(segment_size*8/RTT)")
+        elif args.protocol == "sv":
+            print(f" Throughput teórico: {teorico_kbps:.2f} kbps window_size*(segment_size*8/RTT)")
+        else:
+           print(f" Throughput teórico: {teorico_kbps:.2f} kbps (segment_size*8/RTT)")
+
         print(f" Retransmissões:    {total_retransmissoes}")
         print(f" MD5 calculado:     {md5_calculado}")
         print(" Integridade (MD5): SUCESSO (Sem corrupção)")
