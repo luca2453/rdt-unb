@@ -1,223 +1,399 @@
-# python3 client.py --server 137.131.178.229 --group grupo12 --file small
-
 import argparse
 import csv
-import socket
-import time
 import hashlib
+import socket
+import sys
+import time
+from datetime import datetime
+from typing import TypedDict
 
-def criar_socket(timeout=0.5):
-    # cria e configura o socket UDP
+
+SERVER_PORT = 8080
+SOCKET_TIMEOUT_SECONDS = 0.5
+
+
+class MetricaSegmento(TypedDict):
+    segment: int
+    timestamp: str
+    size_bytes: int
+    rtt_ms: float
+    rtt_estimated_ms: str
+    timeout_ms: float
+    throughput_kbps: float
+    retransmissions: int
+    timeout_occurred: int
+    window_size: int
+    protocol: str
+
+
+def criar_socket(timeout: float = SOCKET_TIMEOUT_SECONDS) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(timeout)
-    
     return sock
 
-def ping(sock, servidor):
-    # envia PING, mede RTT, retorna float em ms
-    inicio = time.time()
-    
+
+def parsear_campos(resposta: bytes) -> tuple[str, dict[str, str]]:
+    texto = resposta.decode("utf-8")
+    partes = texto.split("|")
+    tipo = partes[0]
+    campos: dict[str, str] = {}
+    for campo in partes[1:]:
+        if "=" not in campo:
+            raise ValueError(f"Campo inválido na resposta: {campo!r}")
+        chave, valor = campo.split("=", 1)
+        campos[chave] = valor
+    return tipo, campos
+
+
+def ping(sock: socket.socket, servidor: tuple[str, int]) -> tuple[float, float]:
+    inicio = time.perf_counter()
     sock.sendto(b"PING", servidor)
     try:
         dados, _ = sock.recvfrom(65507)
     except socket.timeout:
-        print("Erro: O servidor demorou a responder no PING (Timeout).")
+        print("Erro: o servidor demorou a responder ao PING (timeout).")
         return 0.0, 0.0
-    
-    rtt = (time.time() - inicio) * 1000
-    
-    resposta = dados.decode("utf-8")
-    _, tempo_str = resposta.split("|time=")
-    tempo_servidor = float(tempo_str)
-    
-    return rtt, tempo_servidor
 
-def hello(sock: socket.socket, servidor: tuple, grupo: str, arquivo: str, segment_size_proposto: int = 512):
-    # Envia HELLO dinâmico, parseia OK, retorna dict com os campos
-    pacote = f"HELLO|grupo={grupo}|segment_size={segment_size_proposto}|file={arquivo}"
+    rtt = (time.perf_counter() - inicio) * 1000
+    try:
+        tipo, campos = parsear_campos(dados)
+        if tipo != "PONG" or "time" not in campos:
+            raise ValueError("resposta não é um PONG válido")
+        return rtt, float(campos["time"])
+    except (UnicodeDecodeError, ValueError) as erro:
+        print(f"Erro: resposta inválida ao PING: {erro}")
+        return 0.0, 0.0
+
+
+def hello(
+    sock: socket.socket,
+    servidor: tuple[str, int],
+    grupo: str,
+    arquivo: str,
+    segment_size_proposto: int = 512,
+) -> dict[str, str]:
+    pacote = (
+        f"HELLO|grupo={grupo}|segment_size={segment_size_proposto}|file={arquivo}"
+    )
     sock.sendto(pacote.encode("utf-8"), servidor)
-    
     try:
         dados, _ = sock.recvfrom(65507)
+        tipo, campos = parsear_campos(dados)
     except socket.timeout:
-        print("Erro: O servidor demorou a responder no HELLO (Timeout).")
+        print("Erro: o servidor demorou a responder ao HELLO (timeout).")
         return {}
-    
-    resposta = dados.decode("utf-8")
-    
-    campos = {}
-    for campo in resposta.split("|")[1:]:
-        chave, valor = campo.split("=", 1)
-        campos[chave] = valor
-    
+    except (UnicodeDecodeError, ValueError) as erro:
+        print(f"Erro: resposta inválida ao HELLO: {erro}")
+        return {}
+
+    if tipo != "OK":
+        print(f"Erro: o servidor não confirmou o HELLO (resposta: {tipo}).")
+        return {}
     return campos
 
-def requisitar_segmento(sock: socket.socket, servidor: tuple, seq: int=0):
-    pacote = f"REQ|seq={seq}"
-    sock.sendto(pacote.encode("utf-8"), servidor)
-    
+
+def requisitar_segmento(
+    sock: socket.socket, servidor: tuple[str, int], seq: int
+) -> bytes | None:
+    sock.sendto(f"REQ|seq={seq}".encode("utf-8"), servidor)
     try:
-        # Fica num loop interno apenas a ler os pacotes que chegam
         while True:
             dados, _ = sock.recvfrom(65507)
             partes = dados.split(b"|", 3)
-            
-            if len(partes) == 4 and partes[0] == b"DATA":
-                _, seq_recebido_str = partes[1].split(b"=")
-                seq_recebido = int(seq_recebido_str)
-                
-                # Se for o pacote certo, devolve o payload
-                if seq_recebido == seq:
-                    return partes[3]
-                
-                # Se for um pacote antigo (seq_recebido != seq), o loop continua
-                # e ele lê o próximo pacote da placa de rede sem reenviar o REQ.
-
+            if len(partes) != 4 or partes[0] != b"DATA":
+                continue
+            try:
+                chave, valor = partes[1].split(b"=", 1)
+                seq_recebido = int(valor) if chave == b"seq" else -1
+            except ValueError:
+                continue
+            if seq_recebido == seq:
+                return partes[3]
     except socket.timeout:
-        # Só retorna erro se passar o tempo total de espera sem chegar o pacote certo
-        return b""
-    
+        return None
 
-def main():
-    # 1. Leitura dos argumentos de linha de comando (argparse)
-    parser = argparse.ArgumentParser(description="Cliente Stop-and-Wait (SAW) - RDT-UnB")
-    parser.add_argument("--server", required=True, help="IP do servidor RDT-UnB")
-    parser.add_argument("--group", required=True, help="Nome do grupo (campo grupo= do HELLO)")
-    parser.add_argument("--file", required=True, choices=["small", "medium", "large"],
-                        help="Arquivo a ser recebido")
-    args = parser.parse_args()  # sem --group, o argparse aborta com erro
 
-    servidor_ip = args.server
-    grupo = args.group
-    arquivo = args.file
+def receber_data(dados: bytes) -> tuple[int, bytes] | None:
+    partes = dados.split(b"|", 3)
+    if len(partes) != 4 or partes[0] != b"DATA":
+        return None
+    try:
+        chave, valor = partes[1].split(b"=", 1)
+        if chave != b"seq":
+            return None
+        return int(valor), partes[3]
+    except ValueError:
+        return None
 
-    sock = criar_socket(timeout=0.5)
-    servidor = (servidor_ip, 8080)
-    
-    print("=== Tarefa 1 — SAW RDT-UnB ===")
-    print(f"Servidor alvo: {servidor_ip}:8080")
-    print(f"Arquivo alvo: {arquivo}\n")
 
-    # Passo 1 — PING 
-    rtt, tempo_servidor = ping(sock, servidor)
-    print(f"[1] PING")
-    print(f"    RTT: {rtt:.2f} ms\n")
-
-    # Passo 2 — HELLO
-    print(f"[2] HELLO")
-    seg_size_proposto = 512
-    
-    retorno = hello(sock, servidor, grupo, arquivo, seg_size_proposto)
-    
-    if not retorno:
-        print("    [!] Erro de timeout no HELLO! Encerrando conexão.")
-        return
-    
-    # Negociacao concluida
-    segment_size_oficial = int(retorno['segment_size'])
-    total_segments = int(retorno['total_segments'])
-    file_size = int(retorno['file_size'])
-    checksum_esperado = retorno['checksum']
-    
-    print(f"    Arquivo:         {arquivo} ({file_size} bytes = {file_size//1024} KB)")
-    print(f"    Checksum MD5:    {checksum_esperado}")
-    print(f"    Total segmentos: {total_segments}")
-    print(f"    Tamanho negociado: {segment_size_oficial} bytes (Proposto: {seg_size_proposto})\n")
-    
-    # Passo 3 - Loop SAW (REQ -> DATA -> ACK)
-    print(f"[3] Iniciando transferência Stop-and-Wait ({total_segments} segmentos)...")
-    
-    arquivo_final = bytearray()
+def transferir_gbn(
+    sock: socket.socket,
+    servidor: tuple[str, int],
+    total_segments: int,
+    window_size: int,
+) -> tuple[bytearray, list[MetricaSegmento], int]:
+    base = 0
+    payloads: dict[int, bytes] = {}
+    retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
+    rtt_por_segmento: dict[int, float] = {}
+    recebido_em: dict[int, str] = {}
+    enviado_uma_vez: set[int] = set()
     total_retransmissoes = 0
-    inicio_transferencia = time.time()
-    
-    metricas = []  # uma linha por segmento para o CSV
 
+    while base < total_segments:
+        fim_janela = min(base + window_size, total_segments)
+        janela_completa = False
+
+        while not janela_completa:
+            primeiro_envio = base
+            if payloads:
+                ausentes = [
+                    seq for seq in range(base, fim_janela)
+                    if seq not in payloads
+                ]
+                primeiro_envio = min(ausentes) if ausentes else fim_janela
+
+            enviados_em = {}
+            for seq in range(primeiro_envio, fim_janela):
+                if seq in enviado_uma_vez:
+                    retransmissoes_por_segmento[seq] += 1
+                    total_retransmissoes += 1
+                sock.sendto(f"REQ|seq={seq}".encode("utf-8"), servidor)
+                enviados_em[seq] = time.perf_counter()
+                enviado_uma_vez.add(seq)
+
+            prazo = time.perf_counter() + SOCKET_TIMEOUT_SECONDS
+            while time.perf_counter() < prazo:
+                restante = prazo - time.perf_counter()
+                sock.settimeout(max(restante, 0.001))
+                try:
+                    dados, _ = sock.recvfrom(65507)
+                except socket.timeout:
+                    break
+
+                data = receber_data(dados)
+                if data is None:
+                    continue
+                seq, payload = data
+                if not base <= seq < fim_janela:
+                    continue
+
+                if seq not in payloads:
+                    payloads[seq] = payload
+                    rtt_por_segmento[seq] = (
+                        time.perf_counter() - enviados_em.get(seq, time.perf_counter())
+                    ) * 1000
+                    recebido_em[seq] = datetime.now().astimezone().isoformat(
+                        timespec="milliseconds"
+                    )
+                # Reconfirma duplicatas para que o servidor possa descartar
+                # retransmissões sem perder o ACK correspondente.
+                sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
+
+                ausentes = [
+                    item for item in range(base, fim_janela)
+                    if item not in payloads
+                ]
+                if not ausentes:
+                    janela_completa = True
+                    break
+
+            if not janela_completa:
+                primeiro_ausente = next(
+                    seq for seq in range(base, fim_janela) if seq not in payloads
+                )
+                print(
+                    f"    [!] Timeout GBN na janela {base}-{fim_janela - 1}; "
+                    f"retransmitindo a partir do segmento {primeiro_ausente}."
+                )
+
+        base = fim_janela
+
+    arquivo_final = bytearray()
     for seq in range(total_segments):
-        retx_seg = 0
-        while True:
-            # 1. Envia REQ e aguarda o pacote DATA (RTT medido nesta tentativa)
-            t0 = time.perf_counter()
-            payload = requisitar_segmento(sock, servidor, seq)
-            rtt_seg = (time.perf_counter() - t0) * 1000  # ms
-            
-            if payload:
-                throughput_seg = (len(payload) * 8 / 1000) / (rtt_seg / 1000)  # kbps
-                metricas.append({
-                    "seq": seq,
-                    "rtt_ms": round(rtt_seg, 3),
-                    "throughput_kbps": round(throughput_seg, 3),
-                    "retransmissoes": retx_seg,
-                    "timeout_ocorrido": int(retx_seg > 0),
-                    "payload_bytes": len(payload),
-                    "t_fim_s": round(time.time() - inicio_transferencia, 6),
-                })
-                # 2. Recebeu com sucesso
-                arquivo_final.extend(payload)
-                
-                # 3. Envia ACK
-                pacote_ack = f"ACK|seq={seq}"
-                sock.sendto(pacote_ack.encode("utf-8"), servidor)
-                
-                # Mostra o progresso a cada 20 segmentos (incluindo o segmento 0)
-                if seq % 20 == 0 or seq == total_segments - 1:
-                    print(f"    [+] Progresso: {seq}/{total_segments - 1} segmentos...")
-                
-                break 
-                
-            else:
-                # O timeout estourou. Registra a retransmissão e tenta de novo
-                total_retransmissoes += 1
-                retx_seg += 1
+        arquivo_final.extend(payloads[seq])
+    metricas = []
+    for seq in range(total_segments):
+        payload = payloads[seq]
+        rtt_seg = rtt_por_segmento[seq]
+        metricas.append({
+            "segment": seq,
+            "timestamp": recebido_em[seq],
+            "size_bytes": len(payload),
+            "rtt_ms": round(rtt_seg, 3),
+            "rtt_estimated_ms": "",
+            "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+            "throughput_kbps": round(
+                len(payload) * 8 / rtt_seg if rtt_seg else 0.0, 3
+            ),
+            "retransmissions": retransmissoes_por_segmento[seq],
+            "timeout_occurred": int(retransmissoes_por_segmento[seq] > 0),
+            "window_size": window_size,
+            "protocol": "gbn",
+        })
+    sock.settimeout(SOCKET_TIMEOUT_SECONDS)
+    return arquivo_final, metricas, total_retransmissoes
 
-    tempo_total = time.time() - inicio_transferencia
 
-    # Salva métricas por segmento em CSV
-    nome_csv = f"metricas_{grupo}_{arquivo}.csv"
-    with open(nome_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(metricas[0].keys()))
-        w.writeheader()
-        w.writerows(metricas)
-    rtt_medio = sum(m["rtt_ms"] for m in metricas) / len(metricas)
-    teorico_kbps = (segment_size_oficial * 8 / 1000) / (rtt_medio / 1000)
-    print(f"\n    CSV salvo em: {nome_csv}")
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Cliente RDT-UnB")
+    parser.add_argument("--server", required=True, help="IP ou hostname do servidor")
+    parser.add_argument("--group", required=True, help="Identificador do grupo")
+    parser.add_argument(
+        "--file", required=True, choices=["small", "medium", "large"],
+        help="Arquivo a ser recebido",
+    )
+    parser.add_argument(
+        "--protocol", choices=["saw", "gbn"], default="saw",
+        help="Protocolo de transferência (padrão: saw)",
+    )
+    parser.add_argument(
+        "--window-size", type=int, choices=[4, 8, 16], default=4,
+        help="Tamanho da janela do GBN (4, 8 ou 16)",
+    )
+    args = parser.parse_args()
 
-    # Passo 4 - Validação de Integridade
-    print("\n[4] Verificando integridade...")
-    md5_calculado = hashlib.md5(arquivo_final).hexdigest()
-    
-    print(f"    MD5 esperado:  {checksum_esperado}")
-    print(f"    MD5 calculado: {md5_calculado}")
+    servidor = (args.server, SERVER_PORT)
+    sock = criar_socket()
+    try:
+        print("=== Tarefa 1 — SAW RDT-UnB ===")
+        print(f"Servidor alvo: {args.server}:{SERVER_PORT}")
+        print(f"Arquivo alvo: {args.file}\n")
 
-    if md5_calculado == checksum_esperado:
-        status_md5 = "SUCESSO (Sem corrupção)"
-    else:
-        status_md5 = "ERRO (Checksum não coincide)"
+        rtt_ping, _ = ping(sock, servidor)
+        print("[1] PING")
+        print(f"    RTT: {rtt_ping:.2f} ms\n")
 
-    # Salva o arquivo recebido em disco (evidência da transferência)
-    nome_saida = f"recebido_{grupo}_{arquivo}.bin"
-    with open(nome_saida, "wb") as f:
-        f.write(arquivo_final)
-    print(f"    Arquivo salvo em: {nome_saida}")
-        
-    # Passo 5 - Relatório Final
-    # Calcula o throughput em kbps (kilobits por segundo)
-    throughput_kbps = (len(arquivo_final) * 8 / 1000) / tempo_total
+        print("[2] HELLO")
+        segment_size_proposto = 512
+        retorno = hello(sock, servidor, args.group, args.file, segment_size_proposto)
+        required = ("segment_size", "total_segments", "file_size", "checksum")
+        if not retorno or any(campo not in retorno for campo in required):
+            print("    [!] HELLO incompleto. Encerrando conexão.")
+            return 1
 
-    print("\n" + "="*45)
-    print(" RELATÓRIO DA TRANSFERÊNCIA (STOP-AND-WAIT)")
-    print("="*45)
-    print(f" Arquivo recebido:  {arquivo}")
-    print(f" Tamanho total:     {len(arquivo_final)} bytes")
-    print(f" Tempo decorrido:   {tempo_total:.2f} segundos")
-    print(f" Throughput médio:  {throughput_kbps:.2f} kbps")
-    print(f" RTT médio:         {rtt_medio:.2f} ms")
-    print(f" Throughput teórico:{teorico_kbps:.2f} kbps  (segment_size*8/RTT_medio)")
-    print(f" Retransmissões:    {total_retransmissoes} pacotes perdidos")
-    print(f" MD5 calculado:     {md5_calculado}")
-    print(f" Integridade (MD5): {status_md5}")
-    print("="*45 + "\n")
-    
-    
+        try:
+            segment_size_oficial = int(retorno["segment_size"])
+            total_segments = int(retorno["total_segments"])
+            file_size = int(retorno["file_size"])
+        except ValueError as erro:
+            print(f"    [!] Parâmetros inválidos no OK: {erro}")
+            return 1
+        checksum_esperado = retorno["checksum"]
+
+        print(f"    Arquivo: {args.file} ({file_size} bytes)")
+        print(f"    Checksum MD5: {checksum_esperado}")
+        print(f"    Total segmentos: {total_segments}")
+        print(
+            f"    Tamanho negociado: {segment_size_oficial} bytes "
+            f"(proposto: {segment_size_proposto})\n"
+        )
+
+        inicio_transferencia = time.perf_counter()
+        if args.protocol == "gbn":
+            print(
+                f"[3] Iniciando transferência Go-Back-N "
+                f"({total_segments} segmentos, janela {args.window_size})..."
+            )
+            arquivo_final, metricas, total_retransmissoes = transferir_gbn(
+                sock, servidor, total_segments, args.window_size
+            )
+        else:
+            print(
+                f"[3] Iniciando transferência Stop-and-Wait "
+                f"({total_segments} segmentos)..."
+            )
+            arquivo_final = bytearray()
+            total_retransmissoes = 0
+            metricas = []
+            for seq in range(total_segments):
+                retransmissoes = 0
+                while True:
+                    inicio_segmento = time.perf_counter()
+                    payload = requisitar_segmento(sock, servidor, seq)
+                    rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
+                    if payload is None:
+                        retransmissoes += 1
+                        total_retransmissoes += 1
+                        continue
+
+                    arquivo_final.extend(payload)
+                    sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
+                    timestamp = datetime.now().astimezone().isoformat(
+                        timespec="milliseconds"
+                    )
+                    throughput_seg = len(payload) * 8 / rtt_seg if rtt_seg else 0.0
+                    metricas.append({
+                        "segment": seq,
+                        "timestamp": timestamp,
+                        "size_bytes": len(payload),
+                        "rtt_ms": round(rtt_seg, 3),
+                        "rtt_estimated_ms": "",
+                        "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+                        "throughput_kbps": round(throughput_seg, 3),
+                        "retransmissions": retransmissoes,
+                        "timeout_occurred": int(retransmissoes > 0),
+                        "window_size": 1,
+                        "protocol": "saw",
+                    })
+                    if seq % 20 == 0 or seq == total_segments - 1:
+                        print(
+                            f"    [+] Progresso: {seq}/{total_segments - 1} segmentos..."
+                        )
+                    break
+
+        tempo_total = time.perf_counter() - inicio_transferencia
+        md5_calculado = hashlib.md5(arquivo_final).hexdigest()
+
+        print("\n[4] Verificando integridade...")
+        print(f"    MD5 esperado:  {checksum_esperado}")
+        print(f"    MD5 calculado: {md5_calculado}")
+        if md5_calculado != checksum_esperado:
+            print("    [!] O arquivo recebido está corrompido.")
+            return 1
+
+        print("\n[5] Encerrando sessão...")
+        print("    Integridade confirmada localmente (MD5).")
+
+        timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nome_csv = f"metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
+        fieldnames = [
+            "segment", "timestamp", "size_bytes", "rtt_ms", "rtt_estimated_ms",
+            "timeout_ms", "throughput_kbps", "retransmissions",
+            "timeout_occurred", "window_size", "protocol",
+        ]
+        with open(nome_csv, "w", newline="", encoding="utf-8") as arquivo_csv:
+            writer = csv.DictWriter(arquivo_csv, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(metricas)
+
+        nome_saida = f"recebido_{args.group}_{args.file}.bin"
+        with open(nome_saida, "wb") as arquivo_binario:
+            arquivo_binario.write(arquivo_final)
+
+        rtt_medio = sum(float(m["rtt_ms"]) for m in metricas) / len(metricas)
+        throughput_kbps = len(arquivo_final) * 8 / 1000 / tempo_total
+        teorico_kbps = segment_size_oficial * 8 / rtt_medio
+        print(f"\n    CSV salvo em: {nome_csv}")
+        print(f"    Arquivo salvo em: {nome_saida}")
+        print("\n" + "=" * 45)
+        nome_protocolo = "GO-BACK-N" if args.protocol == "gbn" else "STOP-AND-WAIT"
+        print(f" RELATÓRIO DA TRANSFERÊNCIA ({nome_protocolo})")
+        print("=" * 45)
+        print(f" Arquivo recebido:  {args.file}")
+        print(f" Tamanho total:     {len(arquivo_final)} bytes")
+        print(f" Tempo decorrido:   {tempo_total:.2f} segundos")
+        print(f" Throughput médio:  {throughput_kbps:.2f} kbps")
+        print(f" RTT médio:         {rtt_medio:.2f} ms")
+        print(f" Throughput teórico: {teorico_kbps:.2f} kbps (segment_size*8/RTT)")
+        print(f" Retransmissões:    {total_retransmissoes}")
+        print(f" MD5 calculado:     {md5_calculado}")
+        print(" Integridade (MD5): SUCESSO (Sem corrupção)")
+        print("=" * 45)
+        return 0
+    finally:
+        sock.close()
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
