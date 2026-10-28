@@ -1,0 +1,173 @@
+% ===========================================================================
+% MODELO DE RELATORIO  ·  ENE0046 Laboratorio de Eletronica  ·  2026/2
+%
+% Como usar
+%   1. Preencha o bloco IDENTIFICACAO logo abaixo.
+%   2. Deixe comentados os autores que nao existirem. Um autor fica centralizado,
+%      dois dividem a linha, tres ocupam tercos.
+%   3. Substitua o texto de cada secao pelo seu. As orientacoes que estao la
+%      dizem o que se espera em cada uma.
+%   4. Compile com pdflatex duas vezes, ou com latexmk -pdf.
+%
+% Estrutura
+%   Roteiro 1 nao tem bancada: use so a subsecao 4.1 e a 5.1, e compare o calculo
+%   analitico com a simulacao de projeto.
+%   Roteiros 2 a 7 usam a estrutura inteira.
+%
+% O arquivo estilo-relatorio.tex e a imagem logo-unb.png devem estar na mesma
+% pasta deste arquivo.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+\input{estilo-relatorio}
+
+% --------------------------- IDENTIFICACAO ---------------------------------
+\roteiro{2}{Janela Deslizante: GBN e SR}
+\aturma{01}
+
+\autorum{Enzo Morrone de Azevedo Muniz}{221035442}
+\autordois{Luca Valderramos Cirino}{211066140}
+\autortres{Raul Myron Silva Amorim}{200049712}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+\capa
+
+% Entrega e avaliação
+%
+% Relatório objetivo em PDF (máximo 8 páginas), contendo obrigatoriamente:
+
+\begin{resumo}
+\end{resumo}
+
+\section{Introdução}
+
+Com a expansão da internet para além dos PCs, se tornou necessário desenvolver aplicações com tempo de resposta mínimo.
+Isso deve-se ao celular, hoje o principal meio de se conectar na internet, que exige protocolos rápidos - devido as exigências dos usuários -
+e confiáveis - devido a perda de pacotes esperada das comunicações sem fio.
+
+Dessa forma, um pode pensar que o protocolo TCP é ideal, porém, devido a perda de pacotes, o mecanismo de confirmar pacotes com ACK
+pode cause retransmissões excessivas, diminuindo a largura de banda da comunicação. Já o UDP também não é ideal, visto que não garante
+a comunicação confiável, apesar de permitir uma largura de banda melhor.
+
+Assim, este relatório é parte 2 de 3, visando criar um novo protocolo que mistura os pontos fortes do UDP e TCP afim de obter
+o melhor dos dois mundos - confiável e rápido. Neste relatório 1, usando o UDP como base, é implementado uma melhoria sobre o
+\textit{Stop-and-Wait} (SAW) do último relatório, o uso de janelas de transmissão nas técnicas \textit{Go-Back-N} (GBN) e \textit{Selective Repeat} (SR).
+
+Em ambos os protocolos, é utilizado uma janela deslizante, onde é mantido a lista dos \textit{n} últimos REQs enviados sem ACK.
+Assim, ao contrário do SAW, ocorre mais de uma transferência de cada vez. A diferença está em como cada um age em caso de um \textit{timeout}.
+
+No \textit{Go-Back-N}, se qualquer segmento sofrer \textit{timeout}, retransmite ele e todos os seguintes; já no \textit{Selective Repeat},
+retransmite apenas o segmento com \textit{timeout} (sem retransmitir os demais).
+
+Assim, espera-se que ambas as novas técnicas obtenham um desempenho melhor que o SAW devido ao uso de janelas de transmissão. Além disso,
+em caso de situações com uma grande perda de pacotes, espera-se que o SR funcione melhor de o GBN, ao evitar requisitar de novo pacotes que
+já foram obtidos com sucesso. Para isso, deve ser implementado um mecanismo de perda de pacotes artificial para testes.
+
+Este relatório está dividido em 3 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
+nos resultados, tem-se a verificação da confiabilidade com o checksum e dados de throughput e retransmissão da transmissão;
+e por último na análise, os dados dos resultados são comentados.
+
+\section{Implementação}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Descrição da implementação — para cada protocolo (GBN e SR), apresente um fluxograma ou máquina de estados descrevendo o comportamento da janela, o critério de retransmissão e o tratamento de segmentos fora de ordem (SR)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Método de simulação de perda — descreva qual abordagem o grupo escolheu (descartar DATA ou não enviar ACK), justifique a escolha e explique como o campo simulated_loss foi registrado no CSV
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Resultados}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Checksum MD5 dos arquivos recebidos em cada protocolo — confirma que a reordenação e remontagem estão corretas
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Tabela comparativa obrigatória — throughput médio, total de retransmissões e tempo total para cada combinação de protocolo × cenário de perda:
+% Protocolo	Janela	Sem perda	5% perda	10% perda
+% SAW	1	—	—	—
+% GBN	4	—	—	—
+% GBN	8	—	—	—
+% GBN	16	—	—	—
+% SR	4	—	—	—
+% SR	8	—	—	—
+% SR	16	—	—	—
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{table}
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Janela} & \textbf{Cenário de perda} & \textbf{Throughput médio} & \textbf{Retransmissões} & \textbf{Tempo total} \\
+\midrule
+	SAW &  1 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	GBN &  4 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	GBN &  8 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	GBN & 16 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	SR  &  4 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	SR  &  8 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+	SR  & 16 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
+
+	SAW &  1 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN &  4 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN &  8 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN & 16 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  &  4 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  &  8 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  & 16 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+
+	SAW &  1 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN &  4 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN &  8 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	GBN & 16 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  &  4 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  &  8 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SR  & 16 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\caption{throughput teórico com base no rtt medido}
+	\label{tab:throughput}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Gráficos por segmento — throughput e número de retransmissões ao longo da transferência, para pelo menos um cenário de perda, comparando GBN e SR com a mesma janela
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[H]
+\centering
+	% \includegraphics[width=0.8\linewidth]{}
+\caption{Throughput e número de retransmissões ao longo da transferência}
+\label{fig:graf_rtt}
+\end{figure}
+
+
+\section{Analise}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Análise obrigatória: a) Qual o impacto do tamanho da janela no throughput de GBN e SR sem perda? A partir de qual tamanho de janela o throughput se estabiliza? Por quê? 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% b) Com 10% de perda e janela 16, quantos segmentos o GBN retransmite para cada erro? E o SR? Mostre isso com dados do CSV. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% c) Por que o GBN sofre mais que o SR com alta taxa de perda? Responda com os números da tabela comparativa.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Conclusão}
+
+
+\section{Referências}
+
+\begin{referencias}
+\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+
+\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\end{referencias}
+
+\end{document}
