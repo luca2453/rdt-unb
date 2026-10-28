@@ -80,55 +80,94 @@ e por último na análise, os dados dos resultados são comentados.
 
 \section{Resultados}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Checksum MD5 dos arquivos recebidos em cada protocolo — confirma que a reordenação e remontagem estão corretas
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Tabela comparativa obrigatória — throughput médio, total de retransmissões e tempo total para cada combinação de protocolo × cenário de perda:
-% Protocolo	Janela	Sem perda	5% perda	10% perda
-% SAW	1	—	—	—
-% GBN	4	—	—	—
-% GBN	8	—	—	—
-% GBN	16	—	—	—
-% SR	4	—	—	—
-% SR	8	—	—	—
-% SR	16	—	—	—
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\begin{table}
+\subsection{Verificação}
+\begin{table}[H]
 \begin{center}
-\begin{tabular}{@{}lrrrrr@{}}
+\begin{tabular}{@{}lr@{}}
 \toprule
-	\textbf{Protocolo} & \textbf{Janela} & \textbf{Cenário de perda} & \textbf{Throughput médio} & \textbf{Retransmissões} & \textbf{Tempo total} \\
+	\textbf{Protocolo} & \textbf{Checksum MD5 calculado} \\
 \midrule
-	SAW &  1 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	GBN &  4 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	GBN &  8 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	GBN & 16 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	SR  &  4 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	SR  &  8 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-	SR  & 16 &  0\% & \SI{}{\kilo\bit\per\second} & 0 & \SI{}{\second} \\
-
-	SAW &  1 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN &  4 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN &  8 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN & 16 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  &  4 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  &  8 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  & 16 &  5\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-
-	SAW &  1 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN &  4 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN &  8 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	GBN & 16 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  &  4 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  &  8 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
-	SR  & 16 & 15\% & \SI{}{\kilo\bit\per\second} &   & \SI{}{\second} \\
+	SAW & 564f9d97cd203fee214569a3de1b54aa \\
+	GBN & 564f9d97cd203fee214569a3de1b54aa \\
+	SR  & 564f9d97cd203fee214569a3de1b54aa \\
 \bottomrule
 \end{tabular}
 \end{center}
-\caption{throughput teórico com base no rtt medido}
+\caption{Dados obtidos dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small}
+	\label{tab:throughput}
+\end{table}
+
+\subsection{Dados}
+Cada entrada da tabela está no formado Throughput médio|Retransmissões totais |Tempo total
+
+Durante as medições, o RTT médio variou entre \SI{30}{\milli\second} a \SI{45}{\milli\second}.
+
+Nas simulações de perda, todas as medições usaram a mesma seed para a geração de número aleatório. Apesar disso, há diferença no número de retransmissões
+devido a perda de pacotes não artificiais e as diferenças dos protocolos no tratamento de timeouts
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & \SI{130.92}{\kilo\bit\per\second}  & \SI{105.53}{\kilo\bit\per\second} & \SI{104.15}{\kilo\bit\per\second} \\
+	GBN-4  & \SI{395.63}{\kilo\bit\per\second}  & \SI{107.46}{\kilo\bit\per\second} & \SI{66.12}{\kilo\bit\per\second} \\
+	GBN-8  & \SI{759.18}{\kilo\bit\per\second}  & \SI{145.63}{\kilo\bit\per\second} & \SI{88.63}{\kilo\bit\per\second} \\
+	GBN-16 & \SI{1497.06}{\kilo\bit\per\second} & \SI{194.51}{\kilo\bit\per\second} & \SI{121.41}{\kilo\bit\per\second} \\
+	SR-4   & \SI{375.31}{\kilo\bit\per\second}  & \SI{243.00}{\kilo\bit\per\second} & \SI{167.35}{\kilo\bit\per\second} \\
+	SR-8   & \SI{889.34}{\kilo\bit\per\second}  & \SI{488.41}{\kilo\bit\per\second} & \SI{329.40}{\kilo\bit\per\second} \\
+	SR-16  & \SI{1648.73}{\kilo\bit\per\second} & \SI{933.47}{\kilo\bit\per\second} & \SI{642.78}{\kilo\bit\per\second} \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Throughput médio obtido dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
+	\label{tab:throughput}
+\end{table}
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & 0 & 122 & 250 \\
+	GBN-4  & 0 & 294 & 566 \\
+	GBN-8  & 0 & 458 & 777 \\
+	GBN-16 & 0 & 789 & 1408 \\
+	SR-4   & 0 & 122 & 249 \\
+	SR-8   & 0 & 122 & 249 \\
+	SR-16  & 0 & 122 & 249 \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Retransmissões totais obtidas dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
+	\label{tab:throughput}
+\end{table}
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & \SI{64.07}{\second} & \SI{79.49}{\second} & \SI{80.54}{\second} \\
+	GBN-4  & \SI{21.20}{\second} & \SI{78.06}{\second} & \SI{126.88}{\second} \\
+	GBN-8  & \SI{11.05}{\second} & \SI{57.60}{\second} & \SI{94.64}{\second} \\
+	GBN-16 & \SI{5.60}{\second}  & \SI{43.13}{\second} & \SI{69.09}{\second} \\
+	SR-4   & \SI{22.35}{\second} & \SI{34.52}{\second} & \SI{50.13}{\second} \\
+	SR-8   & \SI{9.43}{\second}  & \SI{17.18}{\second} & \SI{25.47}{\second} \\
+	SR-16  & \SI{5.09}{\second}  & \SI{8.99}{\second}  & \SI{13.05}{\second} \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Tempo total obtido dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
 	\label{tab:throughput}
 \end{table}
 
@@ -149,6 +188,7 @@ e por último na análise, os dados dos resultados são comentados.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Análise obrigatória: a) Qual o impacto do tamanho da janela no throughput de GBN e SR sem perda? A partir de qual tamanho de janela o throughput se estabiliza? Por quê? 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Ao analisar os resultados, no caso sem perda, é possível observar uma relação diretamente proporcional entre o tamanho da janela e o throughput médio.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % b) Com 10% de perda e janela 16, quantos segmentos o GBN retransmite para cada erro? E o SR? Mostre isso com dados do CSV. 
