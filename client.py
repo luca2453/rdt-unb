@@ -25,6 +25,7 @@ class MetricaSegmento(TypedDict):
     timeout_occurred: int
     window_size: int
     protocol: str
+    simulated_loss: int
 
 
 def criar_socket(timeout: float = SOCKET_TIMEOUT_SECONDS) -> socket.socket:
@@ -137,6 +138,7 @@ def transferir_gbn(
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
+    perdas_simuladas = {seq: 0 for seq in range(total_segments)}
     rtt_por_segmento: dict[int, float] = {}
     recebido_em: dict[int, str] = {}
     enviado_uma_vez: set[int] = set()
@@ -174,12 +176,13 @@ def transferir_gbn(
                     break
 
                 data = receber_data(dados)
-                if random.random() < drop_chance:
-                    continue
-
                 if data is None:
                     continue
                 seq, payload = data
+                # Perda simulada: descarta o DATA recebido com probabilidade P
+                if random.random() < drop_chance:
+                    perdas_simuladas[seq] += 1
+                    continue
                 if not base <= seq < fim_janela:
                     continue
 
@@ -235,6 +238,7 @@ def transferir_gbn(
             "timeout_occurred": int(retransmissoes_por_segmento[seq] > 0),
             "window_size": window_size,
             "protocol": "gbn",
+            "simulated_loss": perdas_simuladas[seq],
         })
     sock.settimeout(SOCKET_TIMEOUT_SECONDS)
     return arquivo_final, metricas, total_retransmissoes
@@ -249,6 +253,7 @@ def transferir_sv(
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
+    perdas_simuladas = {seq: 0 for seq in range(total_segments)}
     rtt_por_segmento: dict[int, float] = {}
     recebido_em: dict[int, str] = {}
     enviado_uma_vez: set[int] = set()
@@ -310,12 +315,13 @@ def transferir_sv(
             continue
 
         data = receber_data(dados)
-        if random.random() < drop_chance:
-            continue
-
         if data is None:
             continue
         seq, payload = data
+        # Perda simulada: descarta o DATA recebido com probabilidade P
+        if random.random() < drop_chance:
+            perdas_simuladas[seq] += 1
+            continue
         if seq < base:
             continue
 
@@ -358,7 +364,8 @@ def transferir_sv(
             "retransmissions": retransmissoes_por_segmento[seq],
             "timeout_occurred": int(retransmissoes_por_segmento[seq] > 0),
             "window_size": window_size,
-            "protocol": "gbn",
+            "protocol": "sr",
+            "simulated_loss": perdas_simuladas[seq],
         })
     sock.settimeout(SOCKET_TIMEOUT_SECONDS)
 
@@ -377,12 +384,19 @@ def transferir_saw(
     total_retransmissoes = 0
 
     for seq in range(total_segments):
+        retransmissoes = 0
+        perdas_simuladas = 0
         while True:
             inicio_segmento = time.perf_counter()
-            retransmissoes = 0
             payload = requisitar_segmento(sock, servidor, seq)
             rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
-            if payload is None or random.random() < drop_chance:
+            if payload is None:
+                retransmissoes += 1
+                total_retransmissoes += 1
+                continue
+            # Perda simulada: descarta o DATA recebido com probabilidade P
+            if random.random() < drop_chance:
+                perdas_simuladas += 1
                 retransmissoes += 1
                 total_retransmissoes += 1
                 continue
@@ -401,10 +415,11 @@ def transferir_saw(
                 "rtt_estimated_ms": "",
                 "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
                 "throughput_kbps": round(throughput_seg, 3),
-                "retransmissions": total_retransmissoes,
-                "timeout_occurred": int(total_retransmissoes > 0),
+                "retransmissions": retransmissoes,
+                "timeout_occurred": int(retransmissoes > 0),
                 "window_size": 1,
                 "protocol": "saw",
+                "simulated_loss": perdas_simuladas,
             })
             if seq % 20 == 0 or seq == total_segments - 1:
                 print(
@@ -522,7 +537,7 @@ def main() -> int:
         fieldnames = [
             "segment", "timestamp", "size_bytes", "rtt_ms", "rtt_estimated_ms",
             "timeout_ms", "throughput_kbps", "retransmissions",
-            "timeout_occurred", "window_size", "protocol",
+            "timeout_occurred", "window_size", "protocol", "simulated_loss",
         ]
         with open(nome_csv, "w", newline="", encoding="utf-8") as arquivo_csv:
             writer = csv.DictWriter(arquivo_csv, fieldnames=fieldnames)
