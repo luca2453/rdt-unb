@@ -37,6 +37,14 @@
 % Relatório objetivo em PDF (máximo 8 páginas), contendo obrigatoriamente:
 
 \begin{resumo}
+Este relatório apresenta a implementação e a avaliação de protocolos de transferência confiável sobre UDP
+utilizando janelas deslizantes. Foram comparadas as estratégias Go-Back-N (GBN) e Selective Repeat (SR),
+com janelas de 4, 8 e 16 segmentos, tendo o Stop-and-Wait (SAW) como referência. Os testes foram realizados
+na transferência de um arquivo de \SI{1}{\mebi\byte}, dividido em segmentos de 512 bytes, em cenários sem
+perdas e com perdas artificiais de 5\% e 10\%. A integridade dos arquivos recebidos foi confirmada pelo checksum
+MD5 nos três protocolos. Sem perdas, o aumento da janela elevou o desempenho da transferência. Sob perdas, o SR
+apresentou maior eficiência e menor tempo de transferência, pois retransmite somente os segmentos perdidos, enquanto
+o GBN retransmite também segmentos posteriores à falha.
 \end{resumo}
 
 \section{Introdução}
@@ -200,6 +208,12 @@ Ao analisar os resultados, no caso sem perda, é possível observar uma relaçã
 
 
 \section{Conclusão}
+
+Neste trabalho foi implementada uma extensão do protocolo confiável desenvolvido na etapa anterior, substituindo o mecanismo Stop-and-Wait por protocolos baseados em janelas deslizantes. Foram consideradas as estratégias Go-Back-N e Selective Repeat, que permitem manter múltiplas requisições de segmentos em andamento e tratam as perdas por meio de timeouts e retransmissões.
+
+A implementação utiliza o UDP como mecanismo de transporte, acrescentando controle de sequência, confirmação dos segmentos recebidos e reconstrução ordenada do arquivo. Também foi incluída uma forma de simular perdas durante a transferência, permitindo avaliar o comportamento dos protocolos em diferentes condições de comunicação. A verificação por checksum MD5 permite confirmar que, apesar das perdas e retransmissões, o arquivo recebido permanece íntegro.
+
+De modo geral, o uso de janelas tende a aproveitar melhor a capacidade da conexão do que o Stop-and-Wait, enquanto a diferença entre Go-Back-N e Selective Repeat se torna especialmente relevante quando ocorrem perdas. A comparação quantitativa entre as janelas e os cenários de perda será complementada na análise dos resultados apresentados neste relatório.
 
 
 \section{Referências}
