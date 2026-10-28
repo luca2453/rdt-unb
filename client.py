@@ -4,6 +4,7 @@ import hashlib
 import socket
 import sys
 import time
+import random
 from datetime import datetime
 from typing import TypedDict
 
@@ -131,6 +132,7 @@ def transferir_gbn(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
+    drop_chance: float
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     base = 0
     payloads: dict[int, bytes] = {}
@@ -172,6 +174,9 @@ def transferir_gbn(
                     break
 
                 data = receber_data(dados)
+                if random.random() < drop_chance:
+                    continue
+
                 if data is None:
                     continue
                 seq, payload = data
@@ -239,6 +244,7 @@ def transferir_sv(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
+    drop_chance: float
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     base = 0
     payloads: dict[int, bytes] = {}
@@ -269,7 +275,7 @@ def transferir_sv(
                     break
     
     def send_all_new():
-        remaining = total_segments - base - len(enviados_em)
+        remaining = total_segments - len(payloads) - len(enviados_em)
         while len(enviados_em) < window_size and remaining > 0:
             send_new()
 
@@ -296,7 +302,7 @@ def transferir_sv(
         except socket.timeout:
             retransmissoes_por_segmento[oldest_transmition_seq] += 1
             total_retransmissoes += 1
-            print(f"seq {oldest_transmition_seq} timeout\n")
+            print(f"seq {oldest_transmition_seq} timeout")
 
             sock.sendto(f"REQ|seq={oldest_transmition_seq}".encode("utf-8"), servidor)
             enviados_em[oldest_transmition_seq] = time.perf_counter()
@@ -304,6 +310,9 @@ def transferir_sv(
             continue
 
         data = receber_data(dados)
+        if random.random() < drop_chance:
+            continue
+
         if data is None:
             continue
         seq, payload = data
@@ -355,6 +364,56 @@ def transferir_sv(
 
     return arquivo_final, metricas, total_retransmissoes
 
+def transferir_saw(
+    sock: socket.socket,
+    servidor: tuple[str, int],
+    total_segments: int,
+    window_size: int,
+    drop_chance: float
+) -> tuple[bytearray, list[MetricaSegmento], int]:
+    assert(window_size == 1)
+    arquivo_final = bytearray()
+    metricas: list[MetricaSegmento] = []
+    total_retransmissoes = 0
+
+    for seq in range(total_segments):
+        while True:
+            inicio_segmento = time.perf_counter()
+            retransmissoes = 0
+            payload = requisitar_segmento(sock, servidor, seq)
+            rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
+            if payload is None or random.random() < drop_chance:
+                retransmissoes += 1
+                total_retransmissoes += 1
+                continue
+
+            arquivo_final.extend(payload)
+            sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
+            timestamp = datetime.now().astimezone().isoformat(
+                timespec="milliseconds"
+            )
+            throughput_seg = len(payload) * 8 / rtt_seg if rtt_seg else 0.0
+            metricas.append({
+                "segment": seq,
+                "timestamp": timestamp,
+                "size_bytes": len(payload),
+                "rtt_ms": round(rtt_seg, 3),
+                "rtt_estimated_ms": "",
+                "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+                "throughput_kbps": round(throughput_seg, 3),
+                "retransmissions": total_retransmissoes,
+                "timeout_occurred": int(total_retransmissoes > 0),
+                "window_size": 1,
+                "protocol": "saw",
+            })
+            if seq % 20 == 0 or seq == total_segments - 1:
+                print(
+                    f"    [+] Progresso: {seq}/{total_segments - 1} segmentos..."
+                )
+            break
+
+    return arquivo_final, metricas, total_retransmissoes
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Cliente RDT-UnB")
@@ -369,8 +428,12 @@ def main() -> int:
         help="Protocolo de transferência (padrão: saw)",
     )
     parser.add_argument(
-        "--window-size", type=int, choices=[4, 8, 16], default=4,
+        "--window-size", type=int, choices=[1, 4, 8, 16], default=4,
         help="Tamanho da janela do GBN (4, 8 ou 16)",
+    )
+    parser.add_argument(
+        "--drop-chance", type=float, default=0,
+        help="Chance de perda de pacote",
     )
     args = parser.parse_args()
 
@@ -379,7 +442,11 @@ def main() -> int:
     try:
         print("=== Tarefa 1 — SAW RDT-UnB ===")
         print(f"Servidor alvo: {args.server}:{SERVER_PORT}")
-        print(f"Arquivo alvo: {args.file}\n")
+        print(f"Arquivo alvo: {args.file}")
+        seed = 12345
+        print(f"Seed para perda de pacotes aleatória: {seed}\n")
+        random.seed(seed)
+        print(f"Chance de perda de pacotes: {args.drop_chance}\n")
 
         rtt_ping, _ = ping(sock, servidor)
         print("[1] PING")
@@ -417,7 +484,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
-                sock, servidor, total_segments, args.window_size
+                sock, servidor, total_segments, args.window_size, args.drop_chance
             )
         elif args.protocol == "sv":
             print(
@@ -425,7 +492,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_sv(
-                sock, servidor, total_segments, args.window_size
+                sock, servidor, total_segments, args.window_size, args.drop_chance
             )
 
         else:
@@ -433,44 +500,9 @@ def main() -> int:
                 f"[3] Iniciando transferência Stop-and-Wait "
                 f"({total_segments} segmentos)..."
             )
-            arquivo_final = bytearray()
-            total_retransmissoes = 0
-            metricas = []
-            for seq in range(total_segments):
-                retransmissoes = 0
-                while True:
-                    inicio_segmento = time.perf_counter()
-                    payload = requisitar_segmento(sock, servidor, seq)
-                    rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
-                    if payload is None:
-                        retransmissoes += 1
-                        total_retransmissoes += 1
-                        continue
-
-                    arquivo_final.extend(payload)
-                    sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
-                    timestamp = datetime.now().astimezone().isoformat(
-                        timespec="milliseconds"
-                    )
-                    throughput_seg = len(payload) * 8 / rtt_seg if rtt_seg else 0.0
-                    metricas.append({
-                        "segment": seq,
-                        "timestamp": timestamp,
-                        "size_bytes": len(payload),
-                        "rtt_ms": round(rtt_seg, 3),
-                        "rtt_estimated_ms": "",
-                        "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
-                        "throughput_kbps": round(throughput_seg, 3),
-                        "retransmissions": retransmissoes,
-                        "timeout_occurred": int(retransmissoes > 0),
-                        "window_size": 1,
-                        "protocol": "saw",
-                    })
-                    if seq % 20 == 0 or seq == total_segments - 1:
-                        print(
-                            f"    [+] Progresso: {seq}/{total_segments - 1} segmentos..."
-                        )
-                    break
+            arquivo_final, metricas, total_retransmissoes = transferir_saw(
+                sock, servidor, total_segments, args.window_size, args.drop_chance
+            )
 
         tempo_total = time.perf_counter() - inicio_transferencia
         md5_calculado = hashlib.md5(arquivo_final).hexdigest()
