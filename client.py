@@ -11,6 +11,7 @@ from typing import TypedDict
 
 SERVER_PORT = 8080
 SOCKET_TIMEOUT_SECONDS = 0.5
+FIN_MAX_ATTEMPTS = 5
 
 
 class MetricaSegmento(TypedDict):
@@ -92,6 +93,39 @@ def hello(
         print(f"Erro: o servidor não confirmou o HELLO (resposta: {tipo}).")
         return {}
     return campos
+
+
+def finalizar_sessao(
+    sock: socket.socket,
+    servidor: tuple[str, int],
+    checksum: str,
+    max_tentativas: int = FIN_MAX_ATTEMPTS,
+) -> bool:
+    """Envia FIN até receber uma confirmação DONE válida do servidor."""
+    pacote = f"FIN|checksum={checksum}".encode("utf-8")
+
+    for tentativa in range(1, max_tentativas + 1):
+        sock.sendto(pacote, servidor)
+        try:
+            while True:
+                dados, _ = sock.recvfrom(65507)
+                try:
+                    tipo, campos = parsear_campos(dados)
+                except (UnicodeDecodeError, ValueError):
+                    continue
+
+                if tipo != "DONE" or campos.get("ok") not in {"0", "1"}:
+                    continue
+                return campos["ok"] == "1"
+        except socket.timeout:
+            if tentativa < max_tentativas:
+                print(
+                    f"    [!] Timeout no FIN "
+                    f"(tentativa {tentativa}/{max_tentativas}); retransmitindo."
+                )
+
+    print("    [!] O servidor não confirmou o FIN após várias tentativas.")
+    return False
 
 
 def requisitar_segmento(
@@ -527,10 +561,17 @@ def main() -> int:
         print(f"    MD5 calculado: {md5_calculado}")
         if md5_calculado != checksum_esperado:
             print("    [!] O arquivo recebido está corrompido.")
-            return 1
+        else:
+            print("    Integridade confirmada localmente (MD5).")
 
         print("\n[5] Encerrando sessão...")
-        print("    Integridade confirmada localmente (MD5).")
+        servidor_confirmou = finalizar_sessao(
+            sock, servidor, md5_calculado
+        )
+        if not servidor_confirmou:
+            print("    [!] O servidor rejeitou o arquivo ou não confirmou o FIN.")
+            return 1
+        print("    Servidor confirmou a integridade (DONE|ok=1).")
 
         timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
         nome_csv = f"metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
