@@ -81,6 +81,10 @@ e por último na análise, os dados dos resultados são comentados.
 % Descrição da implementação — para cada protocolo (GBN e SR), apresente um fluxograma ou máquina de estados descrevendo o comportamento da janela, o critério de retransmissão e o tratamento de segmentos fora de ordem (SR)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Um detalhe importante, para a realização deste relatório, supôs-se que não havia requisito para o tamanho do \textit{output buffer}. 
+Assim, especialmente o \textit{Selective Repeat} consegue seguir solicitando pacotes futuros sem que interfira com a ordem destes pacotes, obtendo
+um throughput bem maior que o \textit{Go-Back-N}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Método de simulação de perda — descreva qual abordagem o grupo escolheu (descartar DATA ou não enviar ACK), justifique a escolha e explique como o campo simulated_loss foi registrado no CSV
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,7 +110,6 @@ e por último na análise, os dados dos resultados são comentados.
 \end{table}
 
 \subsection{Dados}
-Cada entrada da tabela está no formado Throughput médio|Retransmissões totais |Tempo total
 
 Durante as medições, o RTT médio variou entre \SI{30}{\milli\second} a \SI{45}{\milli\second}.
 
@@ -154,7 +157,7 @@ devido a perda de pacotes não artificiais e as diferenças dos protocolos no tr
 \end{tabular}
 \end{center}
 	\caption{Retransmissões totais obtidas dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
-	\label{tab:throughput}
+	\label{tab:retransmissoes}
 \end{table}
 
 \begin{table}[H]
@@ -176,7 +179,7 @@ devido a perda de pacotes não artificiais e as diferenças dos protocolos no tr
 \end{tabular}
 \end{center}
 	\caption{Tempo total obtido dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
-	\label{tab:throughput}
+	\label{tab:tempo}
 \end{table}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -196,16 +199,34 @@ devido a perda de pacotes não artificiais e as diferenças dos protocolos no tr
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Análise obrigatória: a) Qual o impacto do tamanho da janela no throughput de GBN e SR sem perda? A partir de qual tamanho de janela o throughput se estabiliza? Por quê? 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Cenário sem perda}
 Ao analisar os resultados, no caso sem perda, é possível observar uma relação diretamente proporcional entre o tamanho da janela e o throughput médio.
+O motivo é de imediato: quanto maior a janela, mais transmissões estão ocorrendo paralelamente.
+É interessante notar também que o tamanho máximo da janela sugerido de 16, não é capaz saturar totalmente a conexão, 
+visto a razão de aproximadamente 2 entre as transmissões com janelas de tamanho 8 e 16. Assim, estima-se que a transferência poderia ser ainda maior com janelas maiores.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % b) Com 10% de perda e janela 16, quantos segmentos o GBN retransmite para cada erro? E o SR? Mostre isso com dados do CSV. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Perdas no cenário de 10\%}
+Já para o caso de 10\% de perda com janelas de tamanho 16, 
+o número extremamente elevado de retransmissões do GBN na tabela \ref{tab:retransmissoes} chama a atenção - 1408.
+Considerando que ao total, caso não haja perdas, haverá 2048 segmentos, cerca de 40\% do tráfego desse protocolo foi apenas para as retransmissões.
+Comparando com o SR-16, que teve 249 retransmissões, o que equivale a apenas 10,8\% do tráfego.
+
+O valor de perdas do SR surpreende ao não equivaler a exatamente 10\% do tráfego, mas isso é esperado. 
+É importante notar que uma chance de perda de 10\% também se aplica aos pacotes retransmitidos. Desta forma, pode se obter uma expressão 
+para a probabilidade real de perda usando uma série geométrica. Em resumo, espera-se uma taxa de perda de 11,1\%, mais próximo do observado.
+Além disso, o valor de 2048 não é grande o suficiente para que a distribuição aleatória de perda de pacotes se aproxime uma distribuição uniforme,
+ou seja, ao trocar a seed da geração de número aleatório, pode-se esperar uma grande variação da taxa de perda.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % c) Por que o GBN sofre mais que o SR com alta taxa de perda? Responda com os números da tabela comparativa.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+O valor elevado do GBN se explica devido ao fato que este "joga fora" pacotes válidos, pedindo sempre novos caso haja timeout em apenas um pacote da janela.
+Isso é uma clara desvantagem em situações comuns em relação ao SR, que apenas pede os pacotes realmente perdidos. Essa diferença é visível nas tabelas dos resultados,
+o SR consegue taxas de transmissões maiores e número de retransmissão menores que o GBN.
 
 \section{Conclusão}
 
