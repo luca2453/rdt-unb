@@ -23,6 +23,7 @@
 % --------------------------- IDENTIFICACAO ---------------------------------
 \roteiro{2}{Janela Deslizante: GBN e SR}
 \aturma{01}
+\grupo{12}
 
 \autorum{Enzo Morrone de Azevedo Muniz}{221035442}
 \autordois{Luca Valderramos Cirino}{211066140}
@@ -81,13 +82,73 @@ e por último na análise, os dados dos resultados são comentados.
 % Descrição da implementação — para cada protocolo (GBN e SR), apresente um fluxograma ou máquina de estados descrevendo o comportamento da janela, o critério de retransmissão e o tratamento de segmentos fora de ordem (SR)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Um detalhe importante, para a realização deste relatório, supôs-se que não havia requisito para o tamanho do \textit{output buffer}. 
-Assim, especialmente o \textit{Selective Repeat} consegue seguir solicitando pacotes futuros sem que interfira com a ordem destes pacotes, obtendo
-um throughput bem maior que o \textit{Go-Back-N}.
+A implementação foi realizada em Python sobre UDP. Antes da transferência, o cliente envia
+\texttt{PING} e depois um pacote \texttt{HELLO}, informando o grupo, o arquivo desejado e o
+tamanho de segmento proposto. O servidor responde com o tamanho efetivamente negociado, o
+número total de segmentos, o tamanho do arquivo e seu checksum MD5. Cada requisição de dados
+tem o formato \texttt{REQ|seq=N}; a resposta contém \texttt{DATA|seq=N|total=M} seguida do
+payload binário. O cliente confirma cada segmento recebido com
+\texttt{ACK|seq=N}. Portanto, o ACK também permite ao servidor descartar uma retransmissão
+que já foi entregue, sem que o cliente precise armazenar o mesmo payload duas vezes.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Método de simulação de perda — descreva qual abordagem o grupo escolheu (descartar DATA ou não enviar ACK), justifique a escolha e explique como o campo simulated_loss foi registrado no CSV
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Todos os modos usam um dicionário indexado pelo número de sequência para armazenar os
+segmentos recebidos. Ao final, o arquivo é reconstruído concatenando os payloads na ordem
+\(0,1,\ldots,N-1\), independentemente da ordem em que os datagramas chegaram. O socket
+utiliza timeout de \SI{500}{\milli\second}; quando esse prazo expira, o segmento pendente é
+considerado perdido e sua requisição é retransmitida.
+
+\subsection{Go-Back-N}
+
+No GBN, a variável \texttt{base} identifica o primeiro segmento ainda não confirmado e
+\texttt{fim\_janela} delimita a janela atual:
+\[
+  [\texttt{base},\min(\texttt{base}+\texttt{window\_size},N)).
+\]
+Inicialmente, o cliente envia uma requisição para cada segmento da janela. Enquanto aguarda
+as respostas, ele aceita somente segmentos pertencentes à janela atual, registra cada payload
+novo e envia seu ACK. A janela avança quando todos os segmentos do intervalo foram recebidos.
+
+Se o timeout ocorrer antes de completar a janela, o cliente encontra o primeiro segmento
+ausente e reinicia as requisições a partir dele. Os segmentos posteriores que ainda não foram
+armazenados também são solicitados novamente, caracterizando o comportamento de retorno ao
+primeiro ponto perdido do GBN. Segmentos que já foram recebidos permanecem no buffer e não
+são concatenados novamente. Esse mecanismo evita corrupção do arquivo e permite contabilizar
+separadamente, no CSV, as retransmissões de cada número de sequência.
+
+\subsection{Selective Repeat}
+
+No SR, a janela é preenchida continuamente com requisições ainda não confirmadas. Cada
+segmento possui seu próprio instante de envio e pode ser confirmado independentemente dos
+demais. Assim, um segmento recebido fora de ordem é imediatamente armazenado no buffer,
+confirmado com \texttt{ACK} e retirado da lista de transmissões pendentes. A variável
+\texttt{base} só avança quando o segmento que ocupa sua posição já está no buffer; se os
+segmentos seguintes chegaram antes, eles permanecem armazenados até que a lacuna seja
+preenchida.
+
+O timeout do SR é aplicado ao segmento pendente mais antigo. Nesse caso, somente esse
+segmento é requisitado novamente, enquanto os demais segmentos da janela continuam válidos.
+Depois de cada confirmação, novas requisições são enviadas para manter o número de pendências
+até o limite da janela. Como não há requisito adicional de tamanho para o buffer de saída,
+essa estratégia permite receber e armazenar segmentos fora de ordem sem bloqueá-los.
+
+\subsection{Simulação de perdas e métricas}
+
+Para avaliar a robustez dos protocolos, a perda artificial foi simulada no cliente, logo
+após o recebimento de um pacote \texttt{DATA} e antes do seu armazenamento e do envio do
+ACK. Essa escolha representa a situação em que o pacote chega ao receptor, mas é descartado
+antes de ser entregue à camada confiável; consequentemente, o servidor não recebe a
+confirmação e o timeout provoca a retransmissão. A probabilidade é informada pela opção
+\texttt{--drop-chance}, e a mesma semente do gerador pseudoaleatório é usada nos testes
+comparativos.
+
+Para cada segmento, o cliente registra no CSV o RTT, o número de retransmissões,
+\texttt{timeout\_occurred}, o tamanho da janela, o protocolo utilizado e
+\texttt{simulated\_loss}. Este último campo é incrementado cada vez que o segmento é
+descartado pela simulação, inclusive quando se trata de uma retransmissão. Assim, é
+possível distinguir a quantidade de perdas artificiais da quantidade total de requisições
+adicionais. Depois da transferência, o checksum MD5 calculado sobre o arquivo reconstruído
+é comparado ao checksum informado no \texttt{HELLO}; a transferência só é considerada
+válida quando os dois valores coincidem.
 
 
 \section{Resultados}
@@ -188,10 +249,39 @@ devido a perda de pacotes não artificiais e as diferenças dos protocolos no tr
 
 \begin{figure}[H]
 \centering
-	% \includegraphics[width=0.8\linewidth]{}
-\caption{Throughput e número de retransmissões ao longo da transferência}
-\label{fig:graf_rtt}
+\includegraphics[width=0.82\linewidth]{../../comparacao_gbn_sr_janela4.png}
+\caption{Comparação entre GBN e SR com janela 4, sem perdas artificiais.}
+\label{fig:comparacao-janela4}
 \end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{../../comparacao_gbn_sr_janela8.png}
+\caption{Comparação entre GBN e SR com janela 8, sem perdas artificiais.}
+\label{fig:comparacao-janela8}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{../../comparacao_gbn_sr_janela16.png}
+\caption{Comparação entre GBN e SR com janela 16, sem perdas artificiais.}
+\label{fig:comparacao-janela16}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{../../comparacao_gbn_sr_janela16_perda10.png}
+\caption{Comparação entre GBN e SR com janela 16 e perda artificial de 10\%.}
+\label{fig:comparacao-perda10}
+\end{figure}
+
+Os gráficos apresentam, no primeiro painel, o throughput acumulado ao longo dos segmentos
+e, no segundo, as retransmissões acumuladas. Nas Figuras~\ref{fig:comparacao-janela4},
+\ref{fig:comparacao-janela8} e~\ref{fig:comparacao-janela16}, observa-se o efeito do
+aumento da janela em um cenário sem perdas. A Figura~\ref{fig:comparacao-perda10}
+evidencia a diferença entre os protocolos quando ocorrem perdas: o GBN acumula
+retransmissões de segmentos que poderiam continuar válidos, enquanto o SR retransmite
+principalmente os segmentos que não foram confirmados.
 
 
 \section{Analise}

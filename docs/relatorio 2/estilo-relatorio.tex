@@ -61,9 +61,11 @@
 \newcommand{\disciplina}{CIC0236 · Teleinformática e Redes 2}
 \newcommand{\semestre}{2026/2}
 \newcommand{\turma}{}
+\newcommand{\gruponum}{}
 \newcommand{\roteironum}{}
 \newcommand{\roteirotema}{}
 \newcommand{\aturma}[1]{\renewcommand{\turma}{#1}}
+\newcommand{\grupo}[1]{\renewcommand{\gruponum}{#1}}
 \newcommand{\roteiro}[2]{\renewcommand{\roteironum}{#1}\renewcommand{\roteirotema}{#2}}
 
 \newcommand{\umautor}[2]{%
@@ -119,6 +121,8 @@
 \blocoautores
 \ifdefempty{\turma}{}{%
   \begin{center}{\color{cinza}\fontsize{9}{11}\selectfont Turma \turma}\end{center}}
+\ifdefempty{\gruponum}{}{%
+  \begin{center}{\color{cinza}\fontsize{9}{11}\selectfont Grupo \gruponum}\end{center}}
 \vspace{4pt}
 {\color{azulclaro}\hrule height 2pt}
 \vspace{2pt}}
