@@ -37,7 +37,7 @@
 	utilizando o UDP como base. 
 	O protocolo implementado permite a transferência de dados por segmentos, com confirmação de recebimento por mensagens ACK e retransmissão em caso de timeout. 
 	Foram realizados testes com arquivos de diferentes tamanhos, analisando o tempo de ida e volta (Round-Trip Time, RTT) e a taxa de transferência (throughput). 
-	Os resultados obtidos apresentaram RTT médio entre 13,05 e 13,56 ms e throughput medido entre 300,87 e 312,55 kbit/s, valores próximos aos limites teóricos calculados. 
+	Os resultados obtidos apresentaram RTT médio entre 11,51 e 11,95 ms e throughput medido entre 340,42 e 353,03 kbit/s, cerca de 99\,\% dos limites teóricos calculados. 
 	Os testes foram realizados com um servidor desenvolvido pelos autores, pois o servidor disponibilizado para a atividade estava indisponível. 
 	Os resultados evidenciam a influência do RTT no desempenho do protocolo.
 \end{resumo}
@@ -67,9 +67,47 @@ dos resultados são comentádos.
 
 \section{Implementação}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-colocar Fluxograma ou máquina de estados do cliente implementado
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+O cliente foi desenvolvido em Python 3 apenas com bibliotecas nativas: \texttt{socket}
+para a comunicação UDP, \texttt{argparse} para os parâmetros de linha de comando,
+\texttt{hashlib} para o MD5 e \texttt{csv} para o registro das medições. Os parâmetros
+\texttt{-{}-server}, \texttt{-{}-group} e \texttt{-{}-file} são obrigatórios; quando o
+\texttt{-{}-group} não é informado, o próprio \texttt{argparse} interrompe o programa
+antes que qualquer pacote seja enviado.
+
+O funcionamento do cliente pode ser descrito pela máquina de estados da
+Tabela~\ref{tab:estados}, que corresponde ao modelo \textit{stop-and-wait} apresentado
+por Kurose e Ross~[1, Seç.~3.4.1], adaptado ao caso em que é o cliente quem solicita
+cada segmento e controla o temporizador.
+
+\begin{table}[H]
+\centering
+\caption{Estados do cliente e transições entre eles.}
+\label{tab:estados}
+\small
+\begin{tabular}{@{}p{2.6cm}p{5.4cm}p{6.2cm}@{}}
+\toprule
+\textbf{Estado} & \textbf{O que o cliente faz} & \textbf{Próximo estado} \\
+\midrule
+Início & Lê os argumentos e envia um \texttt{PING} & HELLO, ou encerra se faltar \texttt{-{}-group} \\
+HELLO & Envia \texttt{HELLO} e aguarda \texttt{OK} & REQ (guarda \texttt{segment\_size},
+total de segmentos e MD5 esperado); encerra em \textit{timeout} \\
+REQ($n$) & Envia \texttt{REQ|seq=$n$} e aguarda o \texttt{DATA} correspondente &
+ACK($n$) ao receber o segmento certo; volta a REQ($n$) em \textit{timeout}
+(retransmissão); descarta \texttt{DATA} de \texttt{seq} antigo \\
+ACK($n$) & Envia \texttt{ACK|seq=$n$} e grava a linha do CSV & REQ($n+1$) se ainda
+houver segmentos; senão, Verificação \\
+Verificação & Calcula o MD5 do arquivo montado e compara com o do \texttt{OK} &
+Fim \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Em cada segmento, o RTT é obtido pelo intervalo entre o envio do \texttt{REQ} e a
+chegada do \texttt{DATA}, medido com \texttt{time.perf\_counter()}, e o
+\textit{throughput} do segmento é o tamanho do \textit{payload} em bits dividido por esse
+RTT. Cada linha do CSV contém \texttt{seq}, \texttt{rtt\_ms}, \texttt{throughput\_kbps},
+\texttt{retransmissoes}, \texttt{timeout\_ocorrido}, \texttt{payload\_bytes} e
+\texttt{t\_fim\_s}.
 
 \section{Resultados}
 
@@ -82,43 +120,63 @@ colocar Fluxograma ou máquina de estados do cliente implementado
 
 \end{nota}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-colocar Checksum MD5 do arquivo recebido para cada um dos três testes — é a confirmação de que o cliente rodou de verdade
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Verificação de integridade}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-colocar Gráfico de throughput e RTT por segmento para pelo menos um dos arquivos
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+A resposta \texttt{OK} do \textit{handshake} traz o MD5 do arquivo original. Ao término
+da transferência, o cliente junta os \textit{payloads} na ordem dos números de
+sequência, calcula o MD5 do resultado e compara os dois valores. Qualquer segmento
+faltando, repetido ou trocado de posição produziria um \textit{hash} diferente; por isso
+a igualdade é tomada como prova de que o arquivo chegou íntegro. Os três testes
+obrigatórios passaram nessa verificação (Tabela~\ref{tab:md5}).
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\includegraphics[width=0.8\linewidth]{grafico_rtt_small.png}
-	\caption{Gráfico de RTT em millisegundos. Para melhor visualazação, está exibido uma média móvel simples de tamanho 50 dos valores reais.}
-\label{fig:graf_rtt}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\linewidth]{grafico_thoughput_small.png}
-\caption{Gráfico de throughput em kilobytes/segundo. Para melhor visualazação, está exibido uma média móvel simples de tamanho 50 dos valores reais.}
-\label{fig:graf_thoughput}
-\end{figure}
-
-\begin{table}
-\begin{center}
-\begin{tabular}{@{}lrrrr@{}}
+\caption{MD5 calculado pelo cliente para cada arquivo recebido.}
+\label{tab:md5}
+\small
+\begin{tabular}{@{}lrlc@{}}
 \toprule
-\textbf{Arquivo} & \textbf{RTT médio} & \textbf{throughput max teórico} & \textbf{throughput medido} \\
+\textbf{Arquivo} & \textbf{Tamanho (bytes)} & \textbf{MD5} & \textbf{Confere} \\
 \midrule
-	small  & $\SI{13.56}{\milli\second}$ & $\SI{302.12}{\kilo\bit\per\second}$ & $\SI{300.87}{\kilo\bit\per\second}$ \\
-	medium & $\SI{13.05}{\milli\second}$ & $\SI{313.76}{\kilo\bit\per\second}$ & $\SI{312.55}{\kilo\bit\per\second}$ \\
-	large  & $\SI{13.42}{\milli\second}$ & $\SI{305.26}{\kilo\bit\per\second}$ & $\SI{304.11}{\kilo\bit\per\second}$ \\
+small  & 1\,048\,576  & \texttt{517723474e3ac46c0a656492639e854a} & sim \\
+medium & 5\,242\,880  & \texttt{bad146825d357f6c49f3f6689c6e13a2} & sim \\
+large  & 10\,485\,760 & \texttt{eca4b829072dc6492ca929c67dae62a9} & sim \\
 \bottomrule
 \end{tabular}
-\end{center}
-\caption{throughput teórico com base no rtt medido}
-	\label{tab:throughput}
 \end{table}
+
+
+
+
+
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{metricas_grupo12_small.png}
+\caption{RTT (acima) e \textit{throughput} (abaixo) de cada segmento do arquivo
+\textit{small}. As linhas tracejadas indicam o RTT médio (11,95~ms) e o limite teórico
+(342,67~kbps).}
+\label{fig:segmentos}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{\textit{Throughput} teórico máximo e medido (\texttt{segment\_size} = 512~B).}
+\label{tab:throughput}
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Arquivo} & \textbf{RTT médio (ms)} & \textbf{Teórico (kbps)} &
+\textbf{Medido (kbps)} & \textbf{Retx.} & \textbf{Tempo (s)} \\
+\midrule
+small  & 11,95 & 342,67 & 340,42 & 0 & 24,64 \\
+medium & 11,51 & 355,79 & 353,03 & 0 & 118,81 \\
+large  & 11,61 & 352,84 & 350,10 & 0 & 239,61 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 
 \section{Analise}
 
@@ -128,28 +186,34 @@ o próximo segmento, o cliente deve esperar o atual chegar. Dessa forma, o atras
 seguintes.
 
 Além disso, o tamanho do segmento, que é relativamente pequeno, também não contribui. A quantidade de segmentos necessária para a transimição é
-diretamente proporcial ao tamanho do segmento, assim, se o tamanho for pequeno, a quantidade de segmentos será grande, e o atraso devido a espera
+inversamente proporcional ao tamanho do segmento, assim, se o tamanho for pequeno, a quantidade de segmentos será grande, e o atraso devido a espera
 do RTT também será grande. É possivel derivar uma fórmula para obter o throughput teórioco máximo desse método dado o RTT:
 
 $$Throughput_{max} = (segment\_size × 8) / RTT_{medio}$$
 
-Com essa fórmula, teoricamente, um RTT médio de $\SI{10}{\milli\second}$ deveria obter um throughput de $\SI{409,6}{\kilo\bit\per\second}$,
-mas isso é difícil de observar na prática. Na tabela \ref{tab:throughput}, tem-se dados experimentais, e é possível observar que
-o valor teórico máximo não é tão distante do valor real, apesar de um pouco maior.
-Isso se deve ao fato de que o RTT não considera atrasos de processamento do cliente, apenas quanto tempo demorou o servidor para responder.
+Aplicando a fórmula aos RTTs médios medidos, obtém-se 512 $\times$ 8 / 11,95~ms
+= 342,67~kbps para o \textit{small}, 355,79~kbps para o \textit{medium} e 352,84~kbps
+para o \textit{large}. Os valores medidos foram 340,42, 353,03 e 350,10~kbps,
+respectivamente, ou seja, cerca de 99\,\% do teórico em todos os casos
+(Tabela~\ref{tab:throughput}). O teórico fica um pouco acima porque o RTT considera
+apenas o tempo até a resposta do servidor, sem incluir o envio do ACK e o processamento
+no cliente entre um segmento e o próximo. Como não houve nenhuma retransmissão, nenhum
+\textit{timeout} afastou o medido do teórico. Além disso, a vazão quase não muda entre os
+três arquivos, enquanto o tempo total cresce proporcionalmente ao número de segmentos
+(24,6~s, 118,8~s e 239,6~s), o que confirma que o RTT é o fator limitante.
 
 \section{Conclusão}
 
 Assim, este relatório concluíu o objetivo de implmentar um protocolo de comunicação \textit{Stop-and-Wait}. Mostrou-se que ele consegue a trasmição confiável,
-com uma taxa de transimição teórica de $\SI{409,6}{\kilo\bit\per\second}$ com um RTT médio de $\SI{10}{\milli\second}$.
+com vazão medida entre 340 e 353~kbps para um RTT médio de cerca de 12~ms.
 Apesar disso, devido ao fato do servidor de testes provido pelo professor estar fora do ar durante o experimento, as conclusões feitas podem não condizer com as esperadas.
 
 \section{Referências}
 
 \begin{referencias}
-\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+\item {[1]} James F. Kurose \& Keith W. Ross, \emph{Computer Networking: A Top-Down Approach}, 8th ed., Pearson, 2021.
 
-\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\item {[2]} Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
 \end{referencias}
 
 \end{document}
