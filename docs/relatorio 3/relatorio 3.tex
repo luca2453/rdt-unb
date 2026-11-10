@@ -131,8 +131,9 @@ Depois, é definido o novo timeout seguindo a relação:
 
 Essa equação \ref{eq:novo_timeout} é a mesma fórmula usada pelo TCP.
 
-Com isso, resta apenas definir valores razoáveis para \alpha e \beta. O grupo decidiu ir com $\alpha = 0.1$ e $\beta = 0.1$. Esses valores tenderam a ter o melhor
-desempenho nos testes realizados.
+Com isso, resta apenas definir valores razoáveis para \alpha e \beta. O grupo decidiu ir com $\alpha = 0.1$ e $\beta = 0.1$. Quanto maior estes valores,
+mais rápido o protocolo se adapta as mudanças. Esses valores tenderam a ter o melhor desempenho nos testes realizados, visto que as condições de rede
+não costumam mudar muito durante os testes.
 
 \section{Comparação entre timeout fixo e adaptativo}
 
