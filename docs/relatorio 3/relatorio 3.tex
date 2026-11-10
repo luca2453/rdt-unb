@@ -96,6 +96,44 @@ e por último na visão integrada, tem-se dados consolidativos.
 % Gráfico do timeout ao longo da transferência, mostrando como ele se adapta a variações de RTT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+% •       Medir o RTT de cada segmento (tempo entre REQ e DATA correspondente)
+% •       Calcular o RTT estimado usando EWMA: RTT_est = (1 - α) × RTT_est + α × RTT_medido
+% •       Calcular o DevRTT (desvio): DevRTT = (1 - β) × DevRTT + β × |RTT_medido - RTT_est|
+% •       Definir timeout = RTT_est + 4 × DevRTT (fórmula do TCP)
+
+
+A implementação do RTT Adaptativo se deu por meio do seguinte processo:
+
+Primeiro, a cada segmento, é medido o RTT . Depois, usando médias móveis é obtido os valores $RTT_{est}$ e $DevRTT$ usando as seguintes fórmulas:
+
+\begin{equation}
+RTT_{est} = (1 - \alpha) * RTT_{est} + \alpha * RTT_{medido}
+\label{eq:EWMA}
+\end{equation}
+
+\begin{equation}
+	DevRTT = (1 - \beta) * DevRTT + \beta * | RTT_{medido} - RTT_{est} |
+\label{eq:Devrtt}
+\end{equation}
+
+Essas fórmulas são simplesmente uma implementação de uma média móvel exponencial com pesos. 
+Dessa forma, para estimar o valor ideal do RTT, evita-se mudanças bruscas devido a média, mas também permite 
+mudanças um pouco mais rápidas devido a natureza exponencial da média, que possui os termos mais
+recentes com mais peso.
+
+Depois, é definido o novo timeout seguindo a relação:
+
+\begin{equation}
+	\text{timeout} = RTT_{est} + 4 * DevRTT
+	\label{eq:novo_timeout}
+\end{equation}
+
+Essa equação \ref{eq:novo_timeout} é a mesma fórmula usada pelo TCP.
+
+Com isso, resta apenas definir valores razoáveis para \alpha e \beta. O grupo decidiu ir com $\alpha = 0.1$ e $\beta = 0.1$. Esses valores tenderam a ter o melhor
+desempenho nos testes realizados.
+
 \section{Comparação entre timeout fixo e adaptativo}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
