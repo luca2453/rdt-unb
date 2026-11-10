@@ -48,8 +48,42 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 1. Introdução e evolução do projeto
-% Descreva brevemente a jornada: o que foi implementado em cada entrega, quais dificuldades foram encontradas e como foram resolvidas. Não é um resumo burocrático — é uma narrativa técnica de como o grupo evoluiu de um cliente SAW simples até um cliente com RTT adaptativo.
+% Descreva brevemente a jornada: o que foi implementado em cada entrega, 
+% quais dificuldades foram encontradas e como foram resolvidas. Não é um resumo 
+% burocrático — é uma narrativa técnica de como o grupo evoluiu de um cliente 
+% SAW simples até um cliente com RTT adaptativo.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Este é o relatório 3 de 3 no projeto de criar transferência confiável de dados
+no UDP, sendo chamado: \textit{Reliable Data Transfer over UDP – RDT-UnB}.
+
+Na primeiro etapa, já foi implementado transferência confiável por meio do protocolo
+SAW (\textit{Stop-and-Wait}). Resumidamente, apenas um pacote está em trânsito em
+cada momento e, em caso de timeout, ele é solicitado novamente. O SAW simplifica 
+a implementação, mas é muito impactado pelo \textit{Round Trip Time} (RTT) da
+transmição, o que faz ele ter uma largura de banda baixa.
+
+Na segunda etapa, o problema da largura de banda é parcialmente resovido com a adoção
+de janelas de transferência em duas abordagems, a \textit{Go-back-N} (GBN) e 
+\textit{Selective Repeat} (SR). Ambas se diferem apenas na forma de tratar timeouts.
+Sendo N o tamanho da janela, no GBN, em caso de timeout, ele resolicita N pacotes, 
+começando pelo pacote que sofreu timeout. Já o SR, apenas solicita o 1 pacote que sofreu
+timeout.
+
+As implicações disso são: o GBN tem uma lógica mais simples de implementar, mas tende a
+ter um desempenho pior que o SR visto que as perdas de pacotes tendem a ser isoladas,
+trazendo pouco benefício ao resolicitar todos os N-1 pacotes seguintes. Além disso,
+esses protocolos ainda podem sofrer muito com tempos de timeout inadequados.
+
+Por isso, nesta terceira etapa, é implementado uma adição a estes protocolos,
+a de RTT Adaptativo. Ou seja, ao invés do tempo de timeout ser definido previamente,
+o protocolo RDT-UnB passa a ajudar o timeout de forma dinâmica, refletindo as condições
+atuais da rede. Assim, espera-se que os timeouts tenham menos penalização à taxa de
+transmissão, possibilitando um aumento na largura de banda.
+
+Este relatório está dividido em 4 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
+na comparação, tem-se dados com os procolos com e sem timeout fixo; na análise Wireshark, tem-se dados coletados da ferramenta;
+e por último na visão integrada, tem-se dados consolidativos.
 
 \section{RTT Adaptativo - Implementação}
 
