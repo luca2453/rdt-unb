@@ -1,0 +1,123 @@
+% ===========================================================================
+% MODELO DE RELATORIO  ·  ENE0046 Laboratorio de Eletronica  ·  2026/2
+%
+% Como usar
+%   1. Preencha o bloco IDENTIFICACAO logo abaixo.
+%   2. Deixe comentados os autores que nao existirem. Um autor fica centralizado,
+%      dois dividem a linha, tres ocupam tercos.
+%   3. Substitua o texto de cada secao pelo seu. As orientacoes que estao la
+%      dizem o que se espera em cada uma.
+%   4. Compile com pdflatex duas vezes, ou com latexmk -pdf.
+%
+% Estrutura
+%   Roteiro 1 nao tem bancada: use so a subsecao 4.1 e a 5.1, e compare o calculo
+%   analitico com a simulacao de projeto.
+%   Roteiros 2 a 7 usam a estrutura inteira.
+%
+% O arquivo estilo-relatorio.tex e a imagem logo-unb.png devem estar na mesma
+% pasta deste arquivo.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+\input{estilo-relatorio}
+
+% --------------------------- IDENTIFICACAO ---------------------------------
+\roteiro{3}{RTT Adaptativo}
+\aturma{01}
+\grupo{12}
+
+\autorum{Enzo Morrone de Azevedo Muniz}{221035442}
+\autordois{Luca Valderramos Cirino}{211066140}
+\autortres{Raul Myron Silva Amorim}{200049712}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+\capa
+
+% RELATÓRIO FINAL: 
+%
+% Relatório final em PDF (máximo 15 páginas), contendo a evolução completa do projeto,  
+% das três entregas, com análise comparativa entre todas as implementações.
+%
+% Estrutura obrigatória do relatório:
+
+\begin{resumo}
+
+\end{resumo}
+
+\section{Introdução}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. Introdução e evolução do projeto
+% Descreva brevemente a jornada: o que foi implementado em cada entrega, quais dificuldades foram encontradas e como foram resolvidas. Não é um resumo burocrático — é uma narrativa técnica de como o grupo evoluiu de um cliente SAW simples até um cliente com RTT adaptativo.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{RTT Adaptativo - Implementação}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. RTT Adaptativo — implementação
+%
+% Descreva a fórmula EWMA implementada:
+% Justifique os valores de α e β escolhidos:   mostre o impacto nos dados com os valores escolhidos. 
+% Gráfico do RTT estimado vs RTT medido por segmento,  mostrando a convergência do estimador ao longo da transferência
+% Gráfico do timeout ao longo da transferência, mostrando como ele se adapta a variações de RTT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Comparação entre timeout fixo e adaptativo}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. Comparação entre timeout fixo e adaptativo
+%
+% Execute o mesmo protocolo (GBN ou SR, à escolha do grupo) com timeout fixo e com timeout adaptativo, sob perda de 5% e 10%
+% Tabela comparando: número de retransmissões, tempo total, throughput médio
+% Explique: em que situação o timeout adaptativo tem mais vantagem? Em que situação o timeout fixo é suficiente?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Analise Wireshark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. Análise Wireshark
+%
+% Capture o tráfego UDP durante uma transferência com o arquivo large
+% Filtro: udp and host 137.131.178.229
+% Screenshots obrigatórios com anotações:
+% Screenshot 1: visão geral da sessão completa (HELLO → sequência de REQs → FIN → DONE)
+% Screenshot 2: zoom em pelo menos 2 eventos de retransmissão — mostre o REQ original e o REQ retransmitido com o delta de tempo entre eles
+% Screenshot 3: correlação entre um evento do Wireshark (timestamp) e a linha correspondente no CSV
+% Meça o RTT diretamente no Wireshark (tempo entre REQ e DATA) e compare com o RTT registrado pelo cliente no CSV — os valores devem ser próximos; se não forem, explique a diferença
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Visão integrada}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 5. Visão integrada — comparação final de todos os protocolos
+%
+% Tabela única consolidando os resultados das três entregas, com o melhor cenário de cada protocolo:
+%
+% Protocolo	Janela	Timeout	Throughput médio	Retransmissões	Tempo total (large)
+% SAW	1	fixo	—	—	—
+% GBN	16	fixo	—	—	—
+% GBN	16	adaptativo	—	—	—
+% SR	16	fixo	—	—	—
+% SR	16	adaptativo	—	—	—
+% Gráfico de barras comparando throughput médio de todos os protocolos — um único gráfico que conta a história do projeto inteiro.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusão}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 6. Conclusão
+%
+% Qual protocolo teve melhor desempenho no ambiente do projeto (rede real, RTT ~22ms)?
+% O RTT adaptativo valeu a complexidade adicional de implementação? Justifique com dados.
+% O que o grupo implementaria diferente se fosse recomeçar?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Referências}
+
+\begin{referencias}
+\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+
+\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\end{referencias}
+
+\end{document}
