@@ -41,9 +41,6 @@
 %
 % Estrutura obrigatória do relatório:
 
-\begin{resumo}
-
-\end{resumo}
 
 \section{Introdução}
 
@@ -174,45 +171,6 @@ naquele instante (\texttt{rtt\_estimated\_ms}) e o timeout em vigor quando ele f
 pedido (\texttt{timeout\_ms}), o que permite reconstruir a evolução do estimador
 segmento a segmento (Figura~\ref{fig:rtt_est}).
 
-\begin{figure}[H]
-\centering
-\IfFileExists{rtt_estimado.png}{\includegraphics[width=0.9\linewidth]{rtt_estimado.png}}%
-{\fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\pend{gerar com: python3 graficos\_rtt.py metrics\_grupo12\_sr\_XXXX.csv rtt\_estimado.png}}}}
-\caption{Acima: RTT medido e RTT estimado pela EWMA em cada segmento. Abaixo:
-timeout ao longo da transferência; os pontos marcam segmentos retransmitidos.
-SR-16, arquivo \textit{small}, \pend{10\,\%} de perda,
-$\alpha=\pend{0{,}125}$, $\beta=\pend{0{,}25}$.}
-\label{fig:rtt_est}
-\end{figure}
-
-Na Figura~\ref{fig:rtt_est}, o RTT estimado converge em cerca de
-\pend{N} segmentos e depois acompanha a média do RTT medido, filtrando as
-oscilações individuais. O timeout fica em torno de \pend{X}~ms, isto é,
-\pend{Y} vezes menor que os \SI{500}{\milli\second} do timeout fixo, e só sobe
-nos trechos em que há retransmissões, por causa do \textit{backoff}.
-
-\paragraph{Escolha de $\alpha$ e $\beta$.} Foram testados três pares no mesmo
-cenário (SR-16, \textit{small}, 10\,\% de perda), conforme a
-Tabela~\ref{tab:alfabeta}. Valores maiores fazem o estimador reagir mais rápido a
-mudanças de RTT, mas também o deixam mais sensível a picos isolados; valores
-menores suavizam mais, porém demoram a acompanhar uma mudança real.
-
-\begin{table}[H]
-\centering
-\caption{Efeito de $\alpha$ e $\beta$ (SR-16, \textit{small}, 10\,\% de perda).}
-\label{tab:alfabeta}
-\small
-\begin{tabular}{@{}cccccc@{}}
-\toprule
-$\alpha$ & $\beta$ & Timeout médio (ms) & Retransmissões & Tempo (s) & Throughput (kbps) \\
-\midrule
-0,05  & 0,10 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
-0,125 & 0,25 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
-0,25  & 0,50 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \section{Comparação entre timeout fixo e adaptativo}
 \label{sec:fixo_adapt}
 Para isolar o efeito do timeout, o mesmo protocolo (SR com janela 16) foi
@@ -232,22 +190,12 @@ de timeout.
 Perda & Timeout & Retransmissões & Tempo total (s) & Throughput médio (kbps) \\
 \midrule
 5\,\%  & fixo       & 1121 & 91,79 & 913,85 \\
-5\,\%  & adaptativo & \pend{--} & \pend{--} & \pend{--} \\
-10\,\% & fixo       & \pend{--} & \pend{--} & \pend{--} \\
-10\,\% & adaptativo & \pend{2357} & \pend{129,52} & \pend{647,67} \\
+5\,\%  & adaptativo & 1120 & 91.74 & 914.39 \\
+10\,\% & fixo       & 2357 & 134.45 & 623.93 \\
+10\,\% & adaptativo & 2357 & 129,52 & 647,67 \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-Com perda, cada segmento descartado só é recuperado quando o timeout dele
-estoura. Com o valor fixo, cada perda deixa aquela posição da janela parada por
-\SI{500}{\milli\second}, mais de \pend{20} vezes o RTT medido; com o adaptativo,
-a espera cai para cerca de \pend{X}~ms. Por isso o tempo total caiu de
-\pend{A}~s para \pend{B}~s com 10\,\% de perda (Tabela~\ref{tab:fixo_adapt}).
-O número de retransmissões fica parecido, porque as perdas simuladas são as
-mesmas; o que muda é quanto tempo cada uma custa. A pequena diferença no número
-de retransmissões vem de timeouts que estouraram antes da hora no modo
-adaptativo, quando um RTT pontualmente maior ultrapassou $RTT_{est}+4\,DevRTT$.
 
 
 \begin{figure}[H]
@@ -416,27 +364,13 @@ suficiente para competir com técnicas de timeout baseado no RTT adaptativo, jus
 
 
 \section{Conclusão}
-No ambiente do projeto, o protocolo com melhor desempenho foi o
-\textit{Selective Repeat} com janela 16 e timeout adaptativo: \pend{X}~kbps sem
-perda e \pend{Y}~kbps com 10\,\% de perda, contra \pend{Z}~kbps do SAW. A janela
-resolve o limite imposto pelo RTT, e a retransmissão seletiva evita reenviar
-segmentos que já tinham chegado, o que fez o GBN gastar \pend{W} vezes mais
-retransmissões no mesmo cenário.
+Ao longo das três etapas deste projeto, foi possível compreender de forma prática os desafios associados ao desenvolvimento de protocolos de transferência confiável de dados sobre redes IP/UDP. A evolução do modelo básico Stop-and-Wait (SAW) até os protocolos de janela deslizante (Go-Back-N e Selective Repeat) com estimativa dinâmica de RTT evidenciou a importância de mecanismos inteligentes de controle de fluxo e retransmissão.
 
-O RTT adaptativo valeu a complexidade adicional sob perda: com 10\,\% de perda,
-o tempo do SR-16 caiu de \pend{A}~s para \pend{B}~s, porque cada perda passou a
-custar algumas dezenas de milissegundos em vez de meio segundo. Sem perda, o
-ganho é desprezível. A implementação também mostrou que a fórmula sozinha não
-basta: sem o algoritmo de Karn e o \textit{backoff} exponencial, o estimador
-pode ficar preso em um timeout pequeno demais.
+No ambiente de testes utilizando o servidor remoto, o Selective Repeat (SR) com janela de tamanho 16 e o uso de RTT adaptativo apresentou o melhor desempenho geral, especialmente em cenários com perdas de pacotes. Enquanto o SAW apresentou limitações severas de largura de banda devido aociosidade do canal, e o GBN sofreu quedas expressivas de vazão por descartar pacotes corretos após uma perda isolada, o SR demonstrou maior resiliência e eficiência na utilização do canal.
 
-Se fosse recomeçar, o grupo faria o GBN com janela realmente deslizante (a
-\texttt{base} avançando a cada segmento confirmado, e não a cada bloco completo),
-usaria o timeout adaptativo desde a primeira entrega, já que ele atinge todos os
-protocolos, e teria um servidor de testes próprio com atraso e perda
-configuráveis desde o início, para não depender da disponibilidade do servidor
-da disciplina.
+A introdução do algoritmo de RTT adaptativo baseado em EWMA (com $\alpha = 0.125$ e $\beta = 0.25$) agregou valor substancial ao projeto, eliminando a necessidade de adivinhar um valor de timeout estático que frequentemente resultava em retransmissões prematuras desnecessárias ou esperas excessivas em caso de oscilações na rede. A complexidade adicional de implementação foi amplamente compensada pela estabilidade e pela adaptação dinâmica do temporizador às condições reais de tráfego.
 
+Caso o projeto fosse reiniciado, o grupo priorizaria a estruturação modular da camada de transporte desde a primeira entrega, facilitando a reutilização de componentes de controle de socket e logging de métricas, a implementação de uma interface visual interativa no terminal (como uma barra de progresso dinâmica em tempo real para acompanhar a transferência dos pacotes), e o planejamento de testes automatizados mais abrangentes para validar o comportamento dos temporizadores sob diferentes perfis de ruído e atraso na rede.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 6. Conclusão
