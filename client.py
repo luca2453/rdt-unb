@@ -167,8 +167,10 @@ def transferir_gbn(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float
+    drop_chance: float,
+    rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
+    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
@@ -282,8 +284,10 @@ def transferir_sv(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float
+    drop_chance: float,
+    rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
+    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
@@ -410,8 +414,10 @@ def transferir_saw(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float
+    drop_chance: float,
+    rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
+    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     assert(window_size == 1)
     arquivo_final = bytearray()
     metricas: list[MetricaSegmento] = []
@@ -462,6 +468,11 @@ def transferir_saw(
             break
 
     return arquivo_final, metricas, total_retransmissoes
+
+def inicializar_rtt_adaptativo(rtt_ping: float) -> tuple[float, float]:
+    rtt_est = rtt_ping if rtt_ping > 0 else SOCKET_TIMEOUT_SECONDS * 1000
+    dev_rtt = rtt_est / 2.0
+    return rtt_est, dev_rtt
 
 
 def main() -> int:
