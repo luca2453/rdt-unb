@@ -167,8 +167,10 @@ def transferir_gbn(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float
+    drop_chance: float,
+    rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
+    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
@@ -282,8 +284,10 @@ def transferir_sv(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float
+    drop_chance: float,
+    rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
+    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
@@ -463,6 +467,23 @@ def transferir_saw(
 
     return arquivo_final, metricas, total_retransmissoes
 
+def inicializar_rtt_adaptativo(rtt_ping: float) -> tuple[float, float]:
+    rtt_est = rtt_ping if rtt_ping > 0 else SOCKET_TIMEOUT_SECONDS * 1000
+    dev_rtt = rtt_est / 2.0
+    return rtt_est, dev_rtt
+
+def atualizar_rtt_adaptativo(
+    rtt_medido: float,
+    rtt_est: float,
+    dev_rtt: float,
+    alpha: float = 0.125,
+    beta: float = 0.25,
+) -> tuple[float, float, float]:
+    novo_dev_rtt = (1.0 - beta) * dev_rtt + beta * abs(rtt_medido - rtt_est)
+    novo_rtt_est = (1.0 - alpha) * rtt_est + alpha * rtt_medido
+    novo_timeout_ms = novo_rtt_est + 4.0 * novo_dev_rtt
+    return novo_rtt_est, novo_dev_rtt, novo_timeout_ms
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Cliente RDT-UnB")
@@ -533,7 +554,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
-                sock, servidor, total_segments, args.window_size, args.drop_chance
+                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
             )
         elif args.protocol == "sv":
             print(
@@ -541,7 +562,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_sv(
-                sock, servidor, total_segments, args.window_size, args.drop_chance
+                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
             )
 
         else:
