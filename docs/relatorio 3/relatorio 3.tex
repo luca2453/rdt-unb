@@ -376,6 +376,45 @@ GBN com uma janela de tamanho 16 na transferência do arquivo large.
 % Gráfico de barras comparando throughput médio de todos os protocolos — um único gráfico que conta a história do projeto inteiro.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Esta tabela consolida todos os protocolos implementados e mostra a evolução do projeto.
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Timeout} & \textbf{Throughput médio} & \textbf{Retransmissões} & \textbf{Tempo total (large)} \\
+\midrule
+	SAW    & fixo       & \SI{110.47}{\kilo\bit\per\second}  & 6  & \SI{759.34}{\second} \\
+	GBN-16 & fixo       & \SI{1008.06}{\kilo\bit\per\second} & 0  & \SI{83.22}{\second} \\
+	GBN-16 & adaptativo & \SI{1351.72}{\kilo\bit\per\second} & 0  & \SI{62.06}{\second} \\
+	SR-16  & fixo       & \SI{1693.72}{\kilo\bit\per\second} & 8  & \SI{49.53}{\second} \\
+	SR-16  & adaptativo & \SI{1625.88}{\kilo\bit\per\second} & 14 & \SI{51.59}{\second} \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Dados de todos os protocolos desenvolvidos}
+	\label{tab:dados_todos}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{imagens/grafico_barra_total.png}
+\caption{Gráfico de barras do throughput médio observado para cada protocolo}
+\label{fig:graf_barra_throughput}
+\end{figure}
+
+Ao analisá-la, é possível notar valores inesperados, por exemplo, os valores do throughput médio do GBN-16,
+está bem menor que o SR-16 mesmo considerando que o primeiro não houve retransmissões. Isso se deve ao fato
+de que estes protocolos, mesmo com todos os avanços, ainda são extremamente suscetíveis ao RTT. Quando os
+testes foram realizados para o GBN-16, o RTT médio flutuou entre \SI{48}{\milli\second} e \SI{62}{\milli\second}, enquanto o
+SR-16 teve um RTT médio de \SI{39}{\milli\second}. Isso não são falhas dos algorítimos e sim reflexo da
+flutuabilidade da rede nos computadores onde foram realizados os testes.
+
+Além disso, estima-se que o timeout fixo escolhido pelos os autores nos relatórios anteriores já era ótimo
+suficiente para competir com técnicas de timeout baseado no RTT adaptativo, justificando a pouca diferença entre os resultados.
+
+
 \section{Conclusão}
 No ambiente do projeto, o protocolo com melhor desempenho foi o
 \textit{Selective Repeat} com janela 16 e timeout adaptativo: \pend{X}~kbps sem
