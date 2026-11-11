@@ -418,6 +418,7 @@ def transferir_saw(
     rtt_ping: float = 0.0
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
+    timeout_atual_ms = rtt_est + 4.0 * dev_rtt
     assert(window_size == 1)
     arquivo_final = bytearray()
     metricas: list[MetricaSegmento] = []
@@ -427,6 +428,7 @@ def transferir_saw(
         retransmissoes = 0
         perdas_simuladas = 0
         while True:
+            sock.settimeout(timeout_atual_ms / 1000.0)
             inicio_segmento = time.perf_counter()
             payload = requisitar_segmento(sock, servidor, seq)
             rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
@@ -441,6 +443,8 @@ def transferir_saw(
                 total_retransmissoes += 1
                 continue
 
+            rtt_est, dev_rtt, timeout_atual_ms = atualizar_rtt_adaptativo(rtt_seg, rtt_est, dev_rtt)
+
             arquivo_final.extend(payload)
             sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
             timestamp = datetime.now().astimezone().isoformat(
@@ -452,8 +456,8 @@ def transferir_saw(
                 "timestamp": timestamp,
                 "size_bytes": len(payload),
                 "rtt_ms": round(rtt_seg, 3),
-                "rtt_estimated_ms": "",
-                "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+                "rtt_estimated_ms": round(rtt_est, 3),
+                "timeout_ms": round(timeout_atual_ms, 3),
                 "throughput_kbps": round(throughput_seg, 3),
                 "retransmissions": retransmissoes,
                 "timeout_occurred": int(retransmissoes > 0),
@@ -473,6 +477,18 @@ def inicializar_rtt_adaptativo(rtt_ping: float) -> tuple[float, float]:
     rtt_est = rtt_ping if rtt_ping > 0 else SOCKET_TIMEOUT_SECONDS * 1000
     dev_rtt = rtt_est / 2.0
     return rtt_est, dev_rtt
+
+def atualizar_rtt_adaptativo(
+    rtt_medido: float,
+    rtt_est: float,
+    dev_rtt: float,
+    alpha: float = 0.125,
+    beta: float = 0.25,
+) -> tuple[float, float, float]:
+    novo_dev_rtt = (1.0 - beta) * dev_rtt + beta * abs(rtt_medido - rtt_est)
+    novo_rtt_est = (1.0 - alpha) * rtt_est + alpha * rtt_medido
+    novo_timeout_ms = novo_rtt_est + 4.0 * novo_dev_rtt
+    return novo_rtt_est, novo_dev_rtt, novo_timeout_ms
 
 
 def main() -> int:
@@ -544,7 +560,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
-                sock, servidor, total_segments, args.window_size, args.drop_chance
+                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
             )
         elif args.protocol == "sv":
             print(
@@ -552,7 +568,7 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_sv(
-                sock, servidor, total_segments, args.window_size, args.drop_chance
+                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
             )
 
         else:
@@ -561,7 +577,7 @@ def main() -> int:
                 f"({total_segments} segmentos)..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_saw(
-                sock, servidor, total_segments, args.window_size, args.drop_chance
+                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
             )
 
         tempo_total = time.perf_counter() - inicio_transferencia
