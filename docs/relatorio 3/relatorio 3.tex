@@ -159,6 +159,40 @@ não costumam mudar muito durante os testes.
 % Meça o RTT diretamente no Wireshark (tempo entre REQ e DATA) e compare com o RTT registrado pelo cliente no CSV — os valores devem ser próximos; se não forem, explique a diferença
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Foi registrado no Wireshark, uma transferência usando o RTT Adaptativo usando o
+GBN com uma janela de tamanho 16 na transferência do arquivo large. 
+É sugerido ao leitor usar a feramenta de zoom de seu leitor de pdf devido a densidade de informação das imagens.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{imagens/wireshark_inicio.png}
+\caption{Inicio da transferência no wireshark}
+\label{fig:wire_inicio}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{imagens/wireshark_final.png}
+\caption{Final da transferência}
+\label{fig:wire_final}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{imagens/wireshark_retransmissao.png}
+	\caption{Situação de retransmissão. Em destaque, está a primeira solicitação e a segunda. Entre elas, ouve um timeout de \SI{512}{\milli\second}}
+\label{fig:wire_retra1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{imagens/wireshark_csv.png}
+\caption{Uma requisição no Wireshark e no CSV mostrado lado a lado. Estão em destaque o pacote REQ e DATA, e também a linha do CSV respectiva. O cálculo do
+	RTT usando o wireshark resultou em \SI{41.6}{\milli\second} e o CSV registrou \SI{41.8}{\milli\second}. A diferença se dá ao fato de que o
+	wireshark captura o pacote antes do programa em si ter acesso, fazendo-o ter uma leve vantagem em relação ao cliente.}
+\label{fig:wire_csv}
+\end{figure}
+
 \section{Visão integrada}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
