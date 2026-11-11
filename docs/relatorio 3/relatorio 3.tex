@@ -30,6 +30,7 @@
 \autortres{Raul Myron Silva Amorim}{200049712}
 % ---------------------------------------------------------------------------
 
+\newcommand{\pend}[1]{\textcolor{red}{#1}}
 \begin{document}
 \capa
 
@@ -85,6 +86,18 @@ Este relatório está dividido em 4 secções principais: na implementação é 
 na comparação, tem-se dados com os procolos com e sem timeout fixo; na análise Wireshark, tem-se dados coletados da ferramenta;
 e por último na visão integrada, tem-se dados consolidativos.
 
+Ao longo das entregas, algumas dificuldades moldaram a implementação. Na primeira,
+o servidor da disciplina ficou indisponível no fim de semana do prazo, e o grupo
+montou um servidor compatível com o protocolo para validar o cliente. Na segunda,
+o primeiro SR registrava as retransmissões com o rótulo do GBN e o CSV ainda não
+separava a perda simulada da perda real; isso foi corrigido com a coluna
+\texttt{simulated\_loss}. Na terceira, a primeira versão do timeout adaptativo
+entrava em um ciclo de retransmissões falsas: quando o timeout inicial ficava
+menor que o RTT real, todo segmento era retransmitido e, como amostras de
+segmentos retransmitidos são descartadas, o estimador nunca recebia um valor
+válido para corrigir o timeout. A solução foi adotar o \textit{backoff}
+exponencial do TCP, descrito na Seção~\ref{sec:impl_rtt}.
+
 \section{RTT Adaptativo - Implementação}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,11 +144,165 @@ Depois, é definido o novo timeout seguindo a relação:
 
 Essa equação \ref{eq:novo_timeout} é a mesma fórmula usada pelo TCP.
 
-Com isso, resta apenas definir valores razoáveis para \alpha e \beta. O grupo decidiu ir com $\alpha = 0.125$ e $\beta = 0.25$. Quanto maior estes valores,
+Com isso, resta apenas definir valores razoáveis para $\alpha$ e $\beta$. O grupo decidiu ir com $\alpha = 0.125$ e $\beta = 0.25$. Quanto maior estes valores,
 mais rápido o protocolo se adapta as mudanças. Esses valores tenderam a ter o melhor desempenho nos testes realizados, visto que as condições de rede
 não costumam mudar muito durante os testes.
 
+\label{sec:impl_rtt}
+O timeout adaptativo foi aplicado aos três protocolos e é escolhido na linha de
+comando com \texttt{-{}-timeout fixo|adaptativo}; os pesos são definidos por
+\texttt{-{}-alpha} e \texttt{-{}-beta}. Assim, a mesma versão do cliente gera os
+dois cenários comparados na Seção~\ref{sec:fixo_adapt}, e a única diferença entre
+eles é a regra do timeout. Três detalhes da implementação merecem destaque:
+
+\begin{itemize}
+  \item \textbf{Valor inicial.} Antes da transferência o cliente envia um
+  \texttt{PING}; o RTT dessa troca inicializa $RTT_{est}$, e $DevRTT$ começa em
+  metade desse valor, como recomenda o TCP para a primeira amostra.
+  \item \textbf{Algoritmo de Karn.} Quando um segmento é retransmitido, não é
+  possível saber se o \texttt{DATA} recebido responde ao primeiro \texttt{REQ} ou
+  ao segundo. Por isso, só são usadas no EWMA as amostras de segmentos que
+  chegaram na primeira tentativa~[1, Seç.~3.5.3].
+  \item \textbf{Backoff exponencial.} A cada \textit{timeout} o valor é dobrado
+  (limitado a \SI{4}{\second}) e volta a ser calculado pela fórmula assim que
+  chega uma amostra válida. Sem isso, um timeout subestimado nunca se corrige,
+  porque todas as amostras seriam descartadas pelo algoritmo de Karn.
+\end{itemize}
+
+Todo segmento registra no CSV o RTT medido (\texttt{rtt\_ms}), o RTT estimado
+naquele instante (\texttt{rtt\_estimated\_ms}) e o timeout em vigor quando ele foi
+pedido (\texttt{timeout\_ms}), o que permite reconstruir a evolução do estimador
+segmento a segmento (Figura~\ref{fig:rtt_est}).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{rtt_estimado.png}{\includegraphics[width=0.9\linewidth]{rtt_estimado.png}}%
+{\fbox{\parbox[c][4cm][c]{0.85\linewidth}{\centering\pend{gerar com: python3 graficos\_rtt.py metrics\_grupo12\_sr\_XXXX.csv rtt\_estimado.png}}}}
+\caption{Acima: RTT medido e RTT estimado pela EWMA em cada segmento. Abaixo:
+timeout ao longo da transferência; os pontos marcam segmentos retransmitidos.
+SR-16, arquivo \textit{small}, \pend{10\,\%} de perda,
+$\alpha=\pend{0{,}125}$, $\beta=\pend{0{,}25}$.}
+\label{fig:rtt_est}
+\end{figure}
+
+Na Figura~\ref{fig:rtt_est}, o RTT estimado converge em cerca de
+\pend{N} segmentos e depois acompanha a média do RTT medido, filtrando as
+oscilações individuais. O timeout fica em torno de \pend{X}~ms, isto é,
+\pend{Y} vezes menor que os \SI{500}{\milli\second} do timeout fixo, e só sobe
+nos trechos em que há retransmissões, por causa do \textit{backoff}.
+
+\paragraph{Escolha de $\alpha$ e $\beta$.} Foram testados três pares no mesmo
+cenário (SR-16, \textit{small}, 10\,\% de perda), conforme a
+Tabela~\ref{tab:alfabeta}. Valores maiores fazem o estimador reagir mais rápido a
+mudanças de RTT, mas também o deixam mais sensível a picos isolados; valores
+menores suavizam mais, porém demoram a acompanhar uma mudança real.
+
+\begin{table}[H]
+\centering
+\caption{Efeito de $\alpha$ e $\beta$ (SR-16, \textit{small}, 10\,\% de perda).}
+\label{tab:alfabeta}
+\small
+\begin{tabular}{@{}cccccc@{}}
+\toprule
+$\alpha$ & $\beta$ & Timeout médio (ms) & Retransmissões & Tempo (s) & Throughput (kbps) \\
+\midrule
+0,05  & 0,10 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
+0,125 & 0,25 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
+0,25  & 0,50 & \pend{--} & \pend{--} & \pend{--} & \pend{--} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Comparação entre timeout fixo e adaptativo}
+\label{sec:fixo_adapt}
+Para isolar o efeito do timeout, o mesmo protocolo (SR com janela 16) foi
+executado no arquivo \textit{large} com timeout fixo de \SI{500}{\milli\second} e
+com timeout adaptativo, sob 5\,\% e 10\,\% de perda simulada e com a mesma
+\textit{seed}. Assim, os dois casos sofrem exatamente a mesma sequência de
+descartes, e as diferenças da Tabela~\ref{tab:fixo_adapt} se devem apenas à regra
+de timeout.
+
+\begin{table}[H]
+\centering
+\caption{SR-16, arquivo \textit{large}: timeout fixo $\times$ adaptativo.}
+\label{tab:fixo_adapt}
+\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Perda & Timeout & Retransmissões & Tempo total (s) & Throughput médio (kbps) \\
+\midrule
+5\,\%  & fixo       & 1121 & 91,79 & 913,85 \\
+5\,\%  & adaptativo & \pend{--} & \pend{--} & \pend{--} \\
+10\,\% & fixo       & \pend{--} & \pend{--} & \pend{--} \\
+10\,\% & adaptativo & \pend{2357} & \pend{129,52} & \pend{647,67} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Com perda, cada segmento descartado só é recuperado quando o timeout dele
+estoura. Com o valor fixo, cada perda deixa aquela posição da janela parada por
+\SI{500}{\milli\second}, mais de \pend{20} vezes o RTT medido; com o adaptativo,
+a espera cai para cerca de \pend{X}~ms. Por isso o tempo total caiu de
+\pend{A}~s para \pend{B}~s com 10\,\% de perda (Tabela~\ref{tab:fixo_adapt}).
+O número de retransmissões fica parecido, porque as perdas simuladas são as
+mesmas; o que muda é quanto tempo cada uma custa. A pequena diferença no número
+de retransmissões vem de timeouts que estouraram antes da hora no modo
+adaptativo, quando um RTT pontualmente maior ultrapassou $RTT_{est}+4\,DevRTT$.
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{imagens/sr16_fixo_5.png}
+\caption{SR-16, arquivo \textit{large}, 5\,\% de perda, timeout fixo: RTT e
+\textit{throughput} por segmento (RTT médio de 43,9~ms).}
+\label{fig:sr_fixo5}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{imagens/sr16_adapt_10.png}
+\caption{SR-16, arquivo \textit{large}, 10\,\% de perda, timeout
+\pend{adaptativo}: RTT e \textit{throughput} por segmento (RTT médio de 43,2~ms).}
+\label{fig:sr_adapt10}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{imagens/gbn16_adapt_5.png}
+\caption{GBN-16, arquivo \textit{large}, 5\,\% de perda, timeout
+\pend{adaptativo}: RTT e \textit{throughput} por segmento (RTT médio de 46,7~ms;
+7734 retransmissões em 453~s).}
+\label{fig:gbn_adapt5}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{imagens/sr_231747.png}
+\caption{\pend{SR-16, arquivo \textit{large}, [perda e timeout desta execução]}.
+A partir do segmento $\approx$13\,500 o RTT da rede passa de $\approx$40~ms para
+picos de até 110~ms, e o \textit{throughput} por segmento cai na mesma proporção.}
+\label{fig:sr_mudanca}
+\end{figure}
+
+A Figura~\ref{fig:sr_mudanca} mostra o tipo de situação em que um timeout
+adaptativo faz diferença: no meio da transferência o RTT da rede mudou de
+patamar. Um timeout fixo calibrado para o início da sessão ficaria curto demais
+depois da mudança (gerando retransmissões falsas) ou, se fosse longo como os
+\SI{500}{\milli\second}, desperdiçaria tempo a cada perda; o estimador EWMA
+acompanha a mudança em algumas dezenas de amostras.
+
+\paragraph{Quando o adaptativo vale mais a pena?} A vantagem cresce com a taxa
+de perda e com a distância entre o timeout fixo e o RTT real: quanto mais perdas e
+quanto menor o RTT, mais tempo o valor fixo desperdiça esperando. Ele também é a
+única opção segura quando o RTT muda durante a transferência (por exemplo, numa
+rede móvel), porque um valor fixo menor que o RTT geraria retransmissões falsas
+e um valor muito maior desperdiçaria tempo.
+
+\paragraph{Quando o fixo é suficiente?} Sem perda, o timeout nunca chega a
+estourar, então o valor não influencia o resultado, desde que seja maior que o
+maior RTT da rede. Nesse cenário os dois modos têm desempenho praticamente igual
+(Seção~5), e o fixo tem a vantagem de ser mais simples.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 3. Comparação entre timeout fixo e adaptativo
@@ -210,6 +377,27 @@ GBN com uma janela de tamanho 16 na transferência do arquivo large.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Conclusão}
+No ambiente do projeto, o protocolo com melhor desempenho foi o
+\textit{Selective Repeat} com janela 16 e timeout adaptativo: \pend{X}~kbps sem
+perda e \pend{Y}~kbps com 10\,\% de perda, contra \pend{Z}~kbps do SAW. A janela
+resolve o limite imposto pelo RTT, e a retransmissão seletiva evita reenviar
+segmentos que já tinham chegado, o que fez o GBN gastar \pend{W} vezes mais
+retransmissões no mesmo cenário.
+
+O RTT adaptativo valeu a complexidade adicional sob perda: com 10\,\% de perda,
+o tempo do SR-16 caiu de \pend{A}~s para \pend{B}~s, porque cada perda passou a
+custar algumas dezenas de milissegundos em vez de meio segundo. Sem perda, o
+ganho é desprezível. A implementação também mostrou que a fórmula sozinha não
+basta: sem o algoritmo de Karn e o \textit{backoff} exponencial, o estimador
+pode ficar preso em um timeout pequeno demais.
+
+Se fosse recomeçar, o grupo faria o GBN com janela realmente deslizante (a
+\texttt{base} avançando a cada segmento confirmado, e não a cada bloco completo),
+usaria o timeout adaptativo desde a primeira entrega, já que ele atinge todos os
+protocolos, e teria um servidor de testes próprio com atraso e perda
+configuráveis desde o início, para não depender da disponibilidade do servidor
+da disciplina.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 6. Conclusão
