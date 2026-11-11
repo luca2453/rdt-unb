@@ -414,11 +414,8 @@ def transferir_saw(
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
-    drop_chance: float,
-    rtt_ping: float = 0.0
+    drop_chance: float
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
-    rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
-    timeout_atual_ms = rtt_est + 4.0 * dev_rtt
     assert(window_size == 1)
     arquivo_final = bytearray()
     metricas: list[MetricaSegmento] = []
@@ -428,7 +425,6 @@ def transferir_saw(
         retransmissoes = 0
         perdas_simuladas = 0
         while True:
-            sock.settimeout(timeout_atual_ms / 1000.0)
             inicio_segmento = time.perf_counter()
             payload = requisitar_segmento(sock, servidor, seq)
             rtt_seg = (time.perf_counter() - inicio_segmento) * 1000
@@ -443,8 +439,6 @@ def transferir_saw(
                 total_retransmissoes += 1
                 continue
 
-            rtt_est, dev_rtt, timeout_atual_ms = atualizar_rtt_adaptativo(rtt_seg, rtt_est, dev_rtt)
-
             arquivo_final.extend(payload)
             sock.sendto(f"ACK|seq={seq}".encode("utf-8"), servidor)
             timestamp = datetime.now().astimezone().isoformat(
@@ -456,8 +450,8 @@ def transferir_saw(
                 "timestamp": timestamp,
                 "size_bytes": len(payload),
                 "rtt_ms": round(rtt_seg, 3),
-                "rtt_estimated_ms": round(rtt_est, 3),
-                "timeout_ms": round(timeout_atual_ms, 3),
+                "rtt_estimated_ms": "",
+                "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
                 "throughput_kbps": round(throughput_seg, 3),
                 "retransmissions": retransmissoes,
                 "timeout_occurred": int(retransmissoes > 0),
@@ -577,7 +571,7 @@ def main() -> int:
                 f"({total_segments} segmentos)..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_saw(
-                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
+                sock, servidor, total_segments, args.window_size, args.drop_chance
             )
 
         tempo_total = time.perf_counter() - inicio_transferencia
