@@ -380,6 +380,14 @@ Caso o projeto fosse reiniciado, o grupo priorizaria a estruturação modular da
 % O que o grupo implementaria diferente se fosse recomeçar?
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Ao longo das três etapas deste projeto, foi possível compreender de forma prática os desafios associados ao desenvolvimento de protocolos de transferência confiável de dados sobre redes IP/UDP. A evolução do modelo básico Stop-and-Wait (SAW) até os protocolos de janela deslizante (Go-Back-N e Selective Repeat) com estimativa dinâmica de RTT evidenciou a importância de mecanismos inteligentes de controle de fluxo e retransmissão.
+
+No ambiente de testes utilizando o servidor remoto, o Selective Repeat (SR) com janela de tamanho 16 e o uso de RTT adaptativo apresentou o melhor desempenho geral, especialmente em cenários com perdas de pacotes. Enquanto o SAW apresentou limitações severas de largura de banda devido aociosidade do canal, e o GBN sofreu quedas expressivas de vazão por descartar pacotes corretos após uma perda isolada, o SR demonstrou maior resiliência e eficiência na utilização do canal.
+
+A introdução do algoritmo de RTT adaptativo baseado em EWMA (com $\alpha = 0.125$ e $\beta = 0.25$) agregou valor substancial ao projeto, eliminando a necessidade de adivinhar um valor de timeout estático que frequentemente resultava em retransmissões prematuras desnecessárias ou esperas excessivas em caso de oscilações na rede. A complexidade adicional de implementação foi amplamente compensada pela estabilidade e pela adaptação dinâmica do temporizador às condições reais de tráfego.
+
+Caso o projeto fosse reiniciado, o grupo priorizaria a estruturação modular da camada de transporte desde a primeira entrega, facilitando a reutilização de componentes de controle de socket e logging de métricas, a implementação de uma interface visual interativa no terminal (como uma barra de progresso dinâmica em tempo real para acompanhar a transferência dos pacotes), e o planejamento de testes automatizados mais abrangentes para validar o comportamento dos temporizadores sob diferentes perfis de ruído e atraso na rede.
+
 \section{Referências}
 
 \begin{referencias}
