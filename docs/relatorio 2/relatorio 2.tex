@@ -1,0 +1,248 @@
+% ===========================================================================
+% MODELO DE RELATORIO  ·  ENE0046 Laboratorio de Eletronica  ·  2026/2
+%
+% Como usar
+%   1. Preencha o bloco IDENTIFICACAO logo abaixo.
+%   2. Deixe comentados os autores que nao existirem. Um autor fica centralizado,
+%      dois dividem a linha, tres ocupam tercos.
+%   3. Substitua o texto de cada secao pelo seu. As orientacoes que estao la
+%      dizem o que se espera em cada uma.
+%   4. Compile com pdflatex duas vezes, ou com latexmk -pdf.
+%
+% Estrutura
+%   Roteiro 1 nao tem bancada: use so a subsecao 4.1 e a 5.1, e compare o calculo
+%   analitico com a simulacao de projeto.
+%   Roteiros 2 a 7 usam a estrutura inteira.
+%
+% O arquivo estilo-relatorio.tex e a imagem logo-unb.png devem estar na mesma
+% pasta deste arquivo.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+\input{estilo-relatorio}
+
+% --------------------------- IDENTIFICACAO ---------------------------------
+\roteiro{2}{Janela Deslizante: GBN e SR}
+\aturma{01}
+
+\autorum{Enzo Morrone de Azevedo Muniz}{221035442}
+\autordois{Luca Valderramos Cirino}{211066140}
+\autortres{Raul Myron Silva Amorim}{200049712}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+\capa
+
+% Entrega e avaliação
+%
+% Relatório objetivo em PDF (máximo 8 páginas), contendo obrigatoriamente:
+
+\begin{resumo}
+Este relatório apresenta a implementação e a avaliação de protocolos de transferência confiável sobre UDP
+utilizando janelas deslizantes. Foram comparadas as estratégias Go-Back-N (GBN) e Selective Repeat (SR),
+com janelas de 4, 8 e 16 segmentos, tendo o Stop-and-Wait (SAW) como referência. Os testes foram realizados
+na transferência de um arquivo de \SI{1}{\mebi\byte}, dividido em segmentos de 512 bytes, em cenários sem
+perdas e com perdas artificiais de 5\% e 10\%. A integridade dos arquivos recebidos foi confirmada pelo checksum
+MD5 nos três protocolos. Sem perdas, o aumento da janela elevou o desempenho da transferência. Sob perdas, o SR
+apresentou maior eficiência e menor tempo de transferência, pois retransmite somente os segmentos perdidos, enquanto
+o GBN retransmite também segmentos posteriores à falha.
+\end{resumo}
+
+\section{Introdução}
+
+Com a expansão da internet para além dos PCs, se tornou necessário desenvolver aplicações com tempo de resposta mínimo.
+Isso deve-se ao celular, hoje o principal meio de se conectar na internet, que exige protocolos rápidos - devido as exigências dos usuários -
+e confiáveis - devido a perda de pacotes esperada das comunicações sem fio.
+
+Dessa forma, um pode pensar que o protocolo TCP é ideal, porém, devido a perda de pacotes, o mecanismo de confirmar pacotes com ACK
+pode cause retransmissões excessivas, diminuindo a largura de banda da comunicação. Já o UDP também não é ideal, visto que não garante
+a comunicação confiável, apesar de permitir uma largura de banda melhor.
+
+Assim, este relatório é parte 2 de 3, visando criar um novo protocolo que mistura os pontos fortes do UDP e TCP afim de obter
+o melhor dos dois mundos - confiável e rápido. Neste relatório 1, usando o UDP como base, é implementado uma melhoria sobre o
+\textit{Stop-and-Wait} (SAW) do último relatório, o uso de janelas de transmissão nas técnicas \textit{Go-Back-N} (GBN) e \textit{Selective Repeat} (SR).
+
+Em ambos os protocolos, é utilizado uma janela deslizante, onde é mantido a lista dos \textit{n} últimos REQs enviados sem ACK.
+Assim, ao contrário do SAW, ocorre mais de uma transferência de cada vez. A diferença está em como cada um age em caso de um \textit{timeout}.
+
+No \textit{Go-Back-N}, se qualquer segmento sofrer \textit{timeout}, retransmite ele e todos os seguintes; já no \textit{Selective Repeat},
+retransmite apenas o segmento com \textit{timeout} (sem retransmitir os demais).
+
+Assim, espera-se que ambas as novas técnicas obtenham um desempenho melhor que o SAW devido ao uso de janelas de transmissão. Além disso,
+em caso de situações com uma grande perda de pacotes, espera-se que o SR funcione melhor de o GBN, ao evitar requisitar de novo pacotes que
+já foram obtidos com sucesso. Para isso, deve ser implementado um mecanismo de perda de pacotes artificial para testes.
+
+Este relatório está dividido em 3 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
+nos resultados, tem-se a verificação da confiabilidade com o checksum e dados de throughput e retransmissão da transmissão;
+e por último na análise, os dados dos resultados são comentados.
+
+\section{Implementação}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Descrição da implementação — para cada protocolo (GBN e SR), apresente um fluxograma ou máquina de estados descrevendo o comportamento da janela, o critério de retransmissão e o tratamento de segmentos fora de ordem (SR)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Um detalhe importante, para a realização deste relatório, supôs-se que não havia requisito para o tamanho do \textit{output buffer}. 
+Assim, especialmente o \textit{Selective Repeat} consegue seguir solicitando pacotes futuros sem que interfira com a ordem destes pacotes, obtendo
+um throughput bem maior que o \textit{Go-Back-N}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Método de simulação de perda — descreva qual abordagem o grupo escolheu (descartar DATA ou não enviar ACK), justifique a escolha e explique como o campo simulated_loss foi registrado no CSV
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Resultados}
+
+\subsection{Verificação}
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Checksum MD5 calculado} \\
+\midrule
+	SAW & 564f9d97cd203fee214569a3de1b54aa \\
+	GBN & 564f9d97cd203fee214569a3de1b54aa \\
+	SR  & 564f9d97cd203fee214569a3de1b54aa \\
+\bottomrule
+\end{tabular}
+\end{center}
+\caption{Dados obtidos dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small}
+	\label{tab:throughput}
+\end{table}
+
+\subsection{Dados}
+
+Durante as medições, o RTT médio variou entre \SI{30}{\milli\second} a \SI{45}{\milli\second}.
+
+Nas simulações de perda, todas as medições usaram a mesma seed para a geração de número aleatório. Apesar disso, há diferença no número de retransmissões
+devido a perda de pacotes não artificiais e as diferenças dos protocolos no tratamento de timeouts
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & \SI{130.92}{\kilo\bit\per\second}  & \SI{105.53}{\kilo\bit\per\second} & \SI{104.15}{\kilo\bit\per\second} \\
+	GBN-4  & \SI{395.63}{\kilo\bit\per\second}  & \SI{107.46}{\kilo\bit\per\second} & \SI{66.12}{\kilo\bit\per\second} \\
+	GBN-8  & \SI{759.18}{\kilo\bit\per\second}  & \SI{145.63}{\kilo\bit\per\second} & \SI{88.63}{\kilo\bit\per\second} \\
+	GBN-16 & \SI{1497.06}{\kilo\bit\per\second} & \SI{194.51}{\kilo\bit\per\second} & \SI{121.41}{\kilo\bit\per\second} \\
+	SR-4   & \SI{375.31}{\kilo\bit\per\second}  & \SI{243.00}{\kilo\bit\per\second} & \SI{167.35}{\kilo\bit\per\second} \\
+	SR-8   & \SI{889.34}{\kilo\bit\per\second}  & \SI{488.41}{\kilo\bit\per\second} & \SI{329.40}{\kilo\bit\per\second} \\
+	SR-16  & \SI{1648.73}{\kilo\bit\per\second} & \SI{933.47}{\kilo\bit\per\second} & \SI{642.78}{\kilo\bit\per\second} \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Throughput médio obtido dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
+	\label{tab:throughput}
+\end{table}
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & 0 & 122 & 250 \\
+	GBN-4  & 0 & 294 & 566 \\
+	GBN-8  & 0 & 458 & 777 \\
+	GBN-16 & 0 & 789 & 1408 \\
+	SR-4   & 0 & 122 & 249 \\
+	SR-8   & 0 & 122 & 249 \\
+	SR-16  & 0 & 122 & 249 \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Retransmissões totais obtidas dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
+	\label{tab:retransmissoes}
+\end{table}
+
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+	\textbf{Protocolo} & \textbf{Sem Perda} & \textbf{5\% de perda} & \textbf{10\% de perda} \\
+\midrule
+
+	SAW    & \SI{64.07}{\second} & \SI{79.49}{\second} & \SI{80.54}{\second} \\
+	GBN-4  & \SI{21.20}{\second} & \SI{78.06}{\second} & \SI{126.88}{\second} \\
+	GBN-8  & \SI{11.05}{\second} & \SI{57.60}{\second} & \SI{94.64}{\second} \\
+	GBN-16 & \SI{5.60}{\second}  & \SI{43.13}{\second} & \SI{69.09}{\second} \\
+	SR-4   & \SI{22.35}{\second} & \SI{34.52}{\second} & \SI{50.13}{\second} \\
+	SR-8   & \SI{9.43}{\second}  & \SI{17.18}{\second} & \SI{25.47}{\second} \\
+	SR-16  & \SI{5.09}{\second}  & \SI{8.99}{\second}  & \SI{13.05}{\second} \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+	\caption{Tempo total obtido dos protocolos SAW, GBN e SR para a transmissão do arquivo grupo12 small de \SI{1}{\mebi\byte} de tamanho}
+	\label{tab:tempo}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Gráficos por segmento — throughput e número de retransmissões ao longo da transferência, para pelo menos um cenário de perda, comparando GBN e SR com a mesma janela
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[H]
+\centering
+	% \includegraphics[width=0.8\linewidth]{}
+\caption{Throughput e número de retransmissões ao longo da transferência}
+\label{fig:graf_rtt}
+\end{figure}
+
+
+\section{Analise}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Análise obrigatória: a) Qual o impacto do tamanho da janela no throughput de GBN e SR sem perda? A partir de qual tamanho de janela o throughput se estabiliza? Por quê? 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Cenário sem perda}
+Ao analisar os resultados, no caso sem perda, é possível observar uma relação diretamente proporcional entre o tamanho da janela e o throughput médio.
+O motivo é de imediato: quanto maior a janela, mais transmissões estão ocorrendo paralelamente.
+É interessante notar também que o tamanho máximo da janela sugerido de 16, não é capaz saturar totalmente a conexão, 
+visto a razão de aproximadamente 2 entre as transmissões com janelas de tamanho 8 e 16. Assim, estima-se que a transferência poderia ser ainda maior com janelas maiores.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% b) Com 10% de perda e janela 16, quantos segmentos o GBN retransmite para cada erro? E o SR? Mostre isso com dados do CSV. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Perdas no cenário de 10\%}
+Já para o caso de 10\% de perda com janelas de tamanho 16, 
+o número extremamente elevado de retransmissões do GBN na tabela \ref{tab:retransmissoes} chama a atenção - 1408.
+Considerando que ao total, caso não haja perdas, haverá 2048 segmentos, cerca de 40\% do tráfego desse protocolo foi apenas para as retransmissões.
+Comparando com o SR-16, que teve 249 retransmissões, o que equivale a apenas 10,8\% do tráfego.
+
+O valor de perdas do SR surpreende ao não equivaler a exatamente 10\% do tráfego, mas isso é esperado. 
+É importante notar que uma chance de perda de 10\% também se aplica aos pacotes retransmitidos. Desta forma, pode se obter uma expressão 
+para a probabilidade real de perda usando uma série geométrica. Em resumo, espera-se uma taxa de perda de 11,1\%, mais próximo do observado.
+Além disso, o valor de 2048 não é grande o suficiente para que a distribuição aleatória de perda de pacotes se aproxime uma distribuição uniforme,
+ou seja, ao trocar a seed da geração de número aleatório, pode-se esperar uma grande variação da taxa de perda.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% c) Por que o GBN sofre mais que o SR com alta taxa de perda? Responda com os números da tabela comparativa.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+O valor elevado do GBN se explica devido ao fato que este "joga fora" pacotes válidos, pedindo sempre novos caso haja timeout em apenas um pacote da janela.
+Isso é uma clara desvantagem em situações comuns em relação ao SR, que apenas pede os pacotes realmente perdidos. Essa diferença é visível nas tabelas dos resultados,
+o SR consegue taxas de transmissões maiores e número de retransmissão menores que o GBN.
+
+\section{Conclusão}
+
+Neste trabalho foi implementada uma extensão do protocolo confiável desenvolvido na etapa anterior, substituindo o mecanismo Stop-and-Wait por protocolos baseados em janelas deslizantes. Foram consideradas as estratégias Go-Back-N e Selective Repeat, que permitem manter múltiplas requisições de segmentos em andamento e tratam as perdas por meio de timeouts e retransmissões.
+
+A implementação utiliza o UDP como mecanismo de transporte, acrescentando controle de sequência, confirmação dos segmentos recebidos e reconstrução ordenada do arquivo. Também foi incluída uma forma de simular perdas durante a transferência, permitindo avaliar o comportamento dos protocolos em diferentes condições de comunicação. A verificação por checksum MD5 permite confirmar que, apesar das perdas e retransmissões, o arquivo recebido permanece íntegro.
+
+De modo geral, o uso de janelas tende a aproveitar melhor a capacidade da conexão do que o Stop-and-Wait, enquanto a diferença entre Go-Back-N e Selective Repeat se torna especialmente relevante quando ocorrem perdas. A comparação quantitativa entre as janelas e os cenários de perda será complementada na análise dos resultados apresentados neste relatório.
+
+
+\section{Referências}
+
+\begin{referencias}
+\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+
+\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\end{referencias}
+
+\end{document}

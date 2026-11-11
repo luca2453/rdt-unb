@@ -1,0 +1,196 @@
+% ===========================================================================
+% MODELO DE RELATORIO  ·  ENE0046 Laboratorio de Eletronica  ·  2026/2
+%
+% Como usar
+%   1. Preencha o bloco IDENTIFICACAO logo abaixo.
+%   2. Deixe comentados os autores que nao existirem. Um autor fica centralizado,
+%      dois dividem a linha, tres ocupam tercos.
+%   3. Substitua o texto de cada secao pelo seu. As orientacoes que estao la
+%      dizem o que se espera em cada uma.
+%   4. Compile com pdflatex duas vezes, ou com latexmk -pdf.
+%
+% Estrutura
+%   Roteiro 1 nao tem bancada: use so a subsecao 4.1 e a 5.1, e compare o calculo
+%   analitico com a simulacao de projeto.
+%   Roteiros 2 a 7 usam a estrutura inteira.
+%
+% O arquivo estilo-relatorio.tex e a imagem logo-unb.png devem estar na mesma
+% pasta deste arquivo.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+\input{estilo-relatorio}
+
+% --------------------------- IDENTIFICACAO ---------------------------------
+\roteiro{3}{RTT Adaptativo}
+\aturma{01}
+\grupo{12}
+
+\autorum{Enzo Morrone de Azevedo Muniz}{221035442}
+\autordois{Luca Valderramos Cirino}{211066140}
+\autortres{Raul Myron Silva Amorim}{200049712}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+\capa
+
+% RELATÓRIO FINAL: 
+%
+% Relatório final em PDF (máximo 15 páginas), contendo a evolução completa do projeto,  
+% das três entregas, com análise comparativa entre todas as implementações.
+%
+% Estrutura obrigatória do relatório:
+
+\begin{resumo}
+
+\end{resumo}
+
+\section{Introdução}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. Introdução e evolução do projeto
+% Descreva brevemente a jornada: o que foi implementado em cada entrega, 
+% quais dificuldades foram encontradas e como foram resolvidas. Não é um resumo 
+% burocrático — é uma narrativa técnica de como o grupo evoluiu de um cliente 
+% SAW simples até um cliente com RTT adaptativo.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Este é o relatório 3 de 3 no projeto de criar transferência confiável de dados
+no UDP, sendo chamado: \textit{Reliable Data Transfer over UDP – RDT-UnB}.
+
+Na primeiro etapa, já foi implementado transferência confiável por meio do protocolo
+SAW (\textit{Stop-and-Wait}). Resumidamente, apenas um pacote está em trânsito em
+cada momento e, em caso de timeout, ele é solicitado novamente. O SAW simplifica 
+a implementação, mas é muito impactado pelo \textit{Round Trip Time} (RTT) da
+transmição, o que faz ele ter uma largura de banda baixa.
+
+Na segunda etapa, o problema da largura de banda é parcialmente resovido com a adoção
+de janelas de transferência em duas abordagems, a \textit{Go-back-N} (GBN) e 
+\textit{Selective Repeat} (SR). Ambas se diferem apenas na forma de tratar timeouts.
+Sendo N o tamanho da janela, no GBN, em caso de timeout, ele resolicita N pacotes, 
+começando pelo pacote que sofreu timeout. Já o SR, apenas solicita o 1 pacote que sofreu
+timeout.
+
+As implicações disso são: o GBN tem uma lógica mais simples de implementar, mas tende a
+ter um desempenho pior que o SR visto que as perdas de pacotes tendem a ser isoladas,
+trazendo pouco benefício ao resolicitar todos os N-1 pacotes seguintes. Além disso,
+esses protocolos ainda podem sofrer muito com tempos de timeout inadequados.
+
+Por isso, nesta terceira etapa, é implementado uma adição a estes protocolos,
+a de RTT Adaptativo. Ou seja, ao invés do tempo de timeout ser definido previamente,
+o protocolo RDT-UnB passa a ajudar o timeout de forma dinâmica, refletindo as condições
+atuais da rede. Assim, espera-se que os timeouts tenham menos penalização à taxa de
+transmissão, possibilitando um aumento na largura de banda.
+
+Este relatório está dividido em 4 secções principais: na implementação é dito como foi feito o código que implementa o protocolo;
+na comparação, tem-se dados com os procolos com e sem timeout fixo; na análise Wireshark, tem-se dados coletados da ferramenta;
+e por último na visão integrada, tem-se dados consolidativos.
+
+\section{RTT Adaptativo - Implementação}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. RTT Adaptativo — implementação
+%
+% Descreva a fórmula EWMA implementada:
+% Justifique os valores de α e β escolhidos:   mostre o impacto nos dados com os valores escolhidos. 
+% Gráfico do RTT estimado vs RTT medido por segmento,  mostrando a convergência do estimador ao longo da transferência
+% Gráfico do timeout ao longo da transferência, mostrando como ele se adapta a variações de RTT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% •       Medir o RTT de cada segmento (tempo entre REQ e DATA correspondente)
+% •       Calcular o RTT estimado usando EWMA: RTT_est = (1 - α) × RTT_est + α × RTT_medido
+% •       Calcular o DevRTT (desvio): DevRTT = (1 - β) × DevRTT + β × |RTT_medido - RTT_est|
+% •       Definir timeout = RTT_est + 4 × DevRTT (fórmula do TCP)
+
+
+A implementação do RTT Adaptativo se deu por meio do seguinte processo:
+
+Primeiro, a cada segmento, é medido o RTT . Depois, usando médias móveis é obtido os valores $RTT_{est}$ e $DevRTT$ usando as seguintes fórmulas:
+
+\begin{equation}
+RTT_{est} = (1 - \alpha) * RTT_{est} + \alpha * RTT_{medido}
+\label{eq:EWMA}
+\end{equation}
+
+\begin{equation}
+	DevRTT = (1 - \beta) * DevRTT + \beta * | RTT_{medido} - RTT_{est} |
+\label{eq:Devrtt}
+\end{equation}
+
+Essas fórmulas são simplesmente uma implementação de uma média móvel exponencial com pesos. 
+Dessa forma, para estimar o valor ideal do RTT, evita-se mudanças bruscas devido a média, mas também permite 
+mudanças um pouco mais rápidas devido a natureza exponencial da média, que possui os termos mais
+recentes com mais peso.
+
+Depois, é definido o novo timeout seguindo a relação:
+
+\begin{equation}
+	\text{timeout} = RTT_{est} + 4 * DevRTT
+	\label{eq:novo_timeout}
+\end{equation}
+
+Essa equação \ref{eq:novo_timeout} é a mesma fórmula usada pelo TCP.
+
+Com isso, resta apenas definir valores razoáveis para \alpha e \beta. O grupo decidiu ir com $\alpha = 0.1$ e $\beta = 0.1$. Quanto maior estes valores,
+mais rápido o protocolo se adapta as mudanças. Esses valores tenderam a ter o melhor desempenho nos testes realizados, visto que as condições de rede
+não costumam mudar muito durante os testes.
+
+\section{Comparação entre timeout fixo e adaptativo}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. Comparação entre timeout fixo e adaptativo
+%
+% Execute o mesmo protocolo (GBN ou SR, à escolha do grupo) com timeout fixo e com timeout adaptativo, sob perda de 5% e 10%
+% Tabela comparando: número de retransmissões, tempo total, throughput médio
+% Explique: em que situação o timeout adaptativo tem mais vantagem? Em que situação o timeout fixo é suficiente?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Analise Wireshark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. Análise Wireshark
+%
+% Capture o tráfego UDP durante uma transferência com o arquivo large
+% Filtro: udp and host 137.131.178.229
+% Screenshots obrigatórios com anotações:
+% Screenshot 1: visão geral da sessão completa (HELLO → sequência de REQs → FIN → DONE)
+% Screenshot 2: zoom em pelo menos 2 eventos de retransmissão — mostre o REQ original e o REQ retransmitido com o delta de tempo entre eles
+% Screenshot 3: correlação entre um evento do Wireshark (timestamp) e a linha correspondente no CSV
+% Meça o RTT diretamente no Wireshark (tempo entre REQ e DATA) e compare com o RTT registrado pelo cliente no CSV — os valores devem ser próximos; se não forem, explique a diferença
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Visão integrada}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 5. Visão integrada — comparação final de todos os protocolos
+%
+% Tabela única consolidando os resultados das três entregas, com o melhor cenário de cada protocolo:
+%
+% Protocolo	Janela	Timeout	Throughput médio	Retransmissões	Tempo total (large)
+% SAW	1	fixo	—	—	—
+% GBN	16	fixo	—	—	—
+% GBN	16	adaptativo	—	—	—
+% SR	16	fixo	—	—	—
+% SR	16	adaptativo	—	—	—
+% Gráfico de barras comparando throughput médio de todos os protocolos — um único gráfico que conta a história do projeto inteiro.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusão}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 6. Conclusão
+%
+% Qual protocolo teve melhor desempenho no ambiente do projeto (rede real, RTT ~22ms)?
+% O RTT adaptativo valeu a complexidade adicional de implementação? Justifique com dados.
+% O que o grupo implementaria diferente se fosse recomeçar?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Referências}
+
+\begin{referencias}
+\item James F. Kurose \& Keith W. Ross, \emph{Redes de Computadores e a Internet - Uma nova Abordagem}, 8a Edição, Pearson Education / Makron Books.
+
+\item Andrew S. Tanenbaum, \emph{Redes de Computadores}, Pearson Universidades, 5a Edição, 2011
+\end{referencias}
+
+\end{document}
