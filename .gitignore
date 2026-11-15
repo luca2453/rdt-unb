@@ -20,6 +20,9 @@ env/
 /comparacao*.png
 /recebido_*.bin
 
+# Pasta de saída do cliente e dos gráficos (metricas/)
+/metricas/
+
 # ---------- Servidor de teste local ----------
 /data/
 
@@ -42,3 +45,7 @@ docs/**/build/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Arquivos de documentação
+AGENTS.md
+requisitos.md

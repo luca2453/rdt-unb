@@ -1,6 +1,7 @@
 import argparse
 import csv
 import hashlib
+import os
 import socket
 import sys
 import time
@@ -12,6 +13,8 @@ from typing import TypedDict
 SERVER_PORT = 8080
 SOCKET_TIMEOUT_SECONDS = 0.5
 FIN_MAX_ATTEMPTS = 5
+PASTA_SAIDA = "metricas"
+RTO_MINIMO_MS = 100.0
 
 
 class MetricaSegmento(TypedDict):
@@ -19,7 +22,7 @@ class MetricaSegmento(TypedDict):
     timestamp: str
     size_bytes: int
     rtt_ms: float
-    rtt_estimated_ms: str
+    rtt_estimated_ms: float | str
     timeout_ms: float
     throughput_kbps: float
     retransmissions: int
@@ -168,14 +171,24 @@ def transferir_gbn(
     total_segments: int,
     window_size: int,
     drop_chance: float,
-    rtt_ping: float = 0.0
+    rtt_ping: float = 0.0,
+    timeout_adaptativo: bool = False,
+    alpha: float = 0.125,
+    beta: float = 0.25,
+    rto_minimo: float = RTO_MINIMO_MS,
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
+    timeout_atual = (
+        max(rtt_est + 4.0 * dev_rtt, rto_minimo) if timeout_adaptativo
+        else SOCKET_TIMEOUT_SECONDS * 1000
+    )
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
     perdas_simuladas = {seq: 0 for seq in range(total_segments)}
     rtt_por_segmento: dict[int, float] = {}
+    est_por_segmento: dict[int, float] = {}
+    timeout_por_segmento: dict[int, float] = {}
     recebido_em: dict[int, str] = {}
     enviado_uma_vez: set[int] = set()
     total_retransmissoes = 0
@@ -202,7 +215,7 @@ def transferir_gbn(
                 enviados_em[seq] = time.perf_counter()
                 enviado_uma_vez.add(seq)
 
-            prazo = time.perf_counter() + SOCKET_TIMEOUT_SECONDS
+            prazo = time.perf_counter() + timeout_atual / 1000.0
             while time.perf_counter() < prazo:
                 restante = prazo - time.perf_counter()
                 sock.settimeout(max(restante, 0.001))
@@ -227,6 +240,17 @@ def transferir_gbn(
                     rtt_por_segmento[seq] = (
                         time.perf_counter() - enviados_em.get(seq, time.perf_counter())
                     ) * 1000
+                    est_por_segmento[seq] = rtt_est
+                    timeout_por_segmento[seq] = timeout_atual
+                    # Karn: só amostra RTT de segmentos nunca retransmitidos,
+                    # pois o RTT de uma retransmissão não isola o atraso real.
+                    if timeout_adaptativo and retransmissoes_por_segmento[seq] == 0:
+                        rtt_est, dev_rtt, novo_timeout = (
+                            atualizar_rtt_adaptativo(
+                                rtt_por_segmento[seq], rtt_est, dev_rtt, alpha, beta
+                            )
+                        )
+                        timeout_atual = max(novo_timeout, rto_minimo)
                     recebido_em[seq] = datetime.now().astimezone().isoformat(
                         timespec="milliseconds"
                     )
@@ -265,8 +289,8 @@ def transferir_gbn(
             "timestamp": recebido_em[seq],
             "size_bytes": len(payload),
             "rtt_ms": round(rtt_seg, 3),
-            "rtt_estimated_ms": "",
-            "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+            "rtt_estimated_ms": round(est_por_segmento[seq], 3),
+            "timeout_ms": round(timeout_por_segmento[seq], 3),
             "throughput_kbps": round(
                 len(payload) * 8 / rtt_seg if rtt_seg else 0.0, 3
             ),
@@ -279,20 +303,30 @@ def transferir_gbn(
     sock.settimeout(SOCKET_TIMEOUT_SECONDS)
     return arquivo_final, metricas, total_retransmissoes
 
-def transferir_sv(
+def transferir_sr(
     sock: socket.socket,
     servidor: tuple[str, int],
     total_segments: int,
     window_size: int,
     drop_chance: float,
-    rtt_ping: float = 0.0
+    rtt_ping: float = 0.0,
+    timeout_adaptativo: bool = False,
+    alpha: float = 0.125,
+    beta: float = 0.25,
+    rto_minimo: float = RTO_MINIMO_MS,
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
+    timeout_atual = (
+        max(rtt_est + 4.0 * dev_rtt, rto_minimo) if timeout_adaptativo
+        else SOCKET_TIMEOUT_SECONDS * 1000
+    )
     base = 0
     payloads: dict[int, bytes] = {}
     retransmissoes_por_segmento = {seq: 0 for seq in range(total_segments)}
     perdas_simuladas = {seq: 0 for seq in range(total_segments)}
     rtt_por_segmento: dict[int, float] = {}
+    est_por_segmento: dict[int, float] = {}
+    timeout_por_segmento: dict[int, float] = {}
     recebido_em: dict[int, str] = {}
     enviado_uma_vez: set[int] = set()
     total_retransmissoes = 0
@@ -336,7 +370,7 @@ def transferir_sv(
                 oldest_transmition_seq = key
 
 
-        prazo = oldest_transmition + SOCKET_TIMEOUT_SECONDS
+        prazo = oldest_transmition + timeout_atual / 1000.0
 
         restante = prazo - time.perf_counter()
         sock.settimeout(max(restante, 0.001))
@@ -368,6 +402,15 @@ def transferir_sv(
             rtt_por_segmento[seq] = (
                 time.perf_counter() - enviados_em.get(seq, time.perf_counter())
             ) * 1000
+            est_por_segmento[seq] = rtt_est
+            timeout_por_segmento[seq] = timeout_atual
+            # Karn: só amostra RTT de segmentos nunca retransmitidos,
+            # pois o RTT de uma retransmissão não isola o atraso real.
+            if timeout_adaptativo and retransmissoes_por_segmento[seq] == 0:
+                rtt_est, dev_rtt, novo_timeout = atualizar_rtt_adaptativo(
+                    rtt_por_segmento[seq], rtt_est, dev_rtt, alpha, beta
+                )
+                timeout_atual = max(novo_timeout, rto_minimo)
             recebido_em[seq] = datetime.now().astimezone().isoformat(
                 timespec="milliseconds"
             )
@@ -394,8 +437,8 @@ def transferir_sv(
             "timestamp": recebido_em[seq],
             "size_bytes": len(payload),
             "rtt_ms": round(rtt_seg, 3),
-            "rtt_estimated_ms": "",
-            "timeout_ms": SOCKET_TIMEOUT_SECONDS * 1000,
+            "rtt_estimated_ms": round(est_por_segmento[seq], 3),
+            "timeout_ms": round(timeout_por_segmento[seq], 3),
             "throughput_kbps": round(
                 len(payload) * 8 / rtt_seg if rtt_seg else 0.0, 3
             ),
@@ -494,7 +537,7 @@ def main() -> int:
         help="Arquivo a ser recebido",
     )
     parser.add_argument(
-        "--protocol", choices=["saw", "gbn", "sv"], default="saw",
+        "--protocol", choices=["saw", "gbn", "sr"], default="saw",
         help="Protocolo de transferência (padrão: saw)",
     )
     parser.add_argument(
@@ -505,6 +548,22 @@ def main() -> int:
         "--drop-chance", type=float, default=0,
         help="Chance de perda de pacote",
     )
+    parser.add_argument(
+        "--timeout", choices=["fixed", "adaptive"], default="fixed",
+        help="Timeout fixo ou adaptativo (EWMA, fórmula do TCP)",
+    )
+    parser.add_argument(
+        "--alpha", type=float, default=0.125,
+        help="Peso do EWMA do RTT estimado (padrão TCP: 0.125)",
+    )
+    parser.add_argument(
+        "--beta", type=float, default=0.25,
+        help="Peso do EWMA do DevRTT (padrão TCP: 0.25)",
+    )
+    parser.add_argument(
+        "--min-rto", type=float, default=RTO_MINIMO_MS,
+        help="Piso do timeout adaptativo em ms (padrão TCP/RFC 6298; 100 ms)",
+    )
     args = parser.parse_args()
 
     servidor = (args.server, SERVER_PORT)
@@ -514,9 +573,16 @@ def main() -> int:
         print(f"Servidor alvo: {args.server}:{SERVER_PORT}")
         print(f"Arquivo alvo: {args.file}")
         seed = 12345
+        timeout_adaptativo = args.timeout == "adaptive"
         print(f"Seed para perda de pacotes aleatória: {seed}\n")
         random.seed(seed)
         print(f"Chance de perda de pacotes: {args.drop_chance}\n")
+        if timeout_adaptativo:
+            print(
+                f"Timeout adaptativo: ativo (alpha={args.alpha}, beta={args.beta})\n"
+            )
+        else:
+            print(f"Timeout adaptativo: desativado (fixo de 500 ms)\n")
 
         rtt_ping, _ = ping(sock, servidor)
         print("[1] PING")
@@ -554,15 +620,19 @@ def main() -> int:
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
-                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
+                sock, servidor, total_segments, args.window_size,
+                args.drop_chance, rtt_ping, timeout_adaptativo,
+                args.alpha, args.beta, args.min_rto,
             )
-        elif args.protocol == "sv":
+        elif args.protocol == "sr":
             print(
                 f"[3] Iniciando transferência Selective Repeat "
                 f"({total_segments} segmentos, janela {args.window_size})..."
             )
-            arquivo_final, metricas, total_retransmissoes = transferir_sv(
-                sock, servidor, total_segments, args.window_size, args.drop_chance, rtt_ping
+            arquivo_final, metricas, total_retransmissoes = transferir_sr(
+                sock, servidor, total_segments, args.window_size,
+                args.drop_chance, rtt_ping, timeout_adaptativo,
+                args.alpha, args.beta, args.min_rto,
             )
 
         else:
@@ -595,7 +665,19 @@ def main() -> int:
         print("    Servidor confirmou a integridade (DONE|ok=1).")
 
         timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
-        nome_csv = f"metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
+        os.makedirs(PASTA_SAIDA, exist_ok=True)
+        drop_pct = round(args.drop_chance * 100)
+        modo_timeout = "adaptativo" if timeout_adaptativo else "fixo"
+        # SAW roda sempre com janela 1; para os deslizantes, a janela faz
+        # parte do nome (gbn16, sr4, sr8, sr16...).
+        protocolo_tag = (
+            args.protocol if args.protocol == "saw"
+            else f"{args.protocol}{args.window_size}"
+        )
+        nome_csv = (
+            f"{PASTA_SAIDA}/metrics_{args.group}_{protocolo_tag}"
+            f"_{modo_timeout}_drop{drop_pct}_{timestamp_arquivo}.csv"
+        )
         fieldnames = [
             "segment", "timestamp", "size_bytes", "rtt_ms", "rtt_estimated_ms",
             "timeout_ms", "throughput_kbps", "retransmissions",
@@ -606,7 +688,13 @@ def main() -> int:
             writer.writeheader()
             writer.writerows(metricas)
 
-        nome_saida = f"recebido_{args.group}_{args.file}.bin"
+        try:
+            import graficos
+            graficos.gerar(nome_csv)
+        except Exception as erro:
+            print(f"    [!] Não foi possível gerar o gráfico do CSV: {erro}")
+
+        nome_saida = f"{PASTA_SAIDA}/recebido_{args.group}_{args.file}.bin"
         with open(nome_saida, "wb") as arquivo_binario:
             arquivo_binario.write(arquivo_final)
 
@@ -616,7 +704,7 @@ def main() -> int:
 
         if args.protocol == "gbn":
             teorico_kbps= args.window_size*(segment_size_oficial * 8) / rtt_medio
-        elif args.protocol == "sv":
+        elif args.protocol == "sr":
             teorico_kbps= args.window_size*(segment_size_oficial * 8) / rtt_medio
         else:
             teorico_kbps= segment_size_oficial * 8 / rtt_medio
@@ -628,7 +716,7 @@ def main() -> int:
         nome_protocolo = "STOP-AND-WAIT"
         if args.protocol == "gbn":
             nome_protocolo = "GO-BACK-N"
-        elif args.protocol == "sv":
+        elif args.protocol == "sr":
             nome_protocolo = "SELECTIVE-REPEAT"
         print(f" RELATÓRIO DA TRANSFERÊNCIA ({nome_protocolo})")
         print("=" * 45)
@@ -640,7 +728,7 @@ def main() -> int:
         
         if args.protocol == "gbn":
             print(f" Throughput teórico: {teorico_kbps:.2f} kbps window_size*(segment_size*8/RTT)")
-        elif args.protocol == "sv":
+        elif args.protocol == "sr":
             print(f" Throughput teórico: {teorico_kbps:.2f} kbps window_size*(segment_size*8/RTT)")
         else:
            print(f" Throughput teórico: {teorico_kbps:.2f} kbps (segment_size*8/RTT)")
@@ -648,6 +736,11 @@ def main() -> int:
         print(f" Retransmissões:    {total_retransmissoes}")
         print(f" MD5 calculado:     {md5_calculado}")
         print(" Integridade (MD5): SUCESSO (Sem corrupção)")
+        if timeout_adaptativo:
+            print(
+                f" RTT estimado final: {metricas[-1]['rtt_estimated_ms']} ms"
+            )
+            print(f" Timeout final:      {metricas[-1]['timeout_ms']} ms")
         print("=" * 45)
         return 0
     finally:
