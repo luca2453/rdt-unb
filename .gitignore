@@ -20,6 +20,9 @@ env/
 /comparacao*.png
 /recebido_*.bin
 
+# Pasta de saída do cliente e dos gráficos (metricas/)
+/metricas/
+
 # ---------- Servidor de teste local ----------
 /data/
 

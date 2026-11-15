@@ -19,6 +19,7 @@ graficos.py             RTT e throughput por segmento
 graficos_comparacao.py  gráfico GBN x SR
 Makefile                atalhos para rodar os protocolos
 docs/                   relatórios (LaTeX)
+metricas/               CSVs, BINs e PNGs gerados (criada na execução)
 ```
 
 ## Instalação
@@ -53,7 +54,7 @@ python client.py --server 137.131.178.229 --group grupo12 --file small --protoco
 | `--window-size` | não | 1, 4, 8 ou 16 |
 | `--drop-chance` | não | perda simulada (ex.: `0.1` = 10%) |
 
-Ao final o cliente valida o MD5 e gera:
+Ao final o cliente valida o MD5 e gera, dentro da pasta `metricas/`:
 
 - `metrics_<grupo>_<protocolo>_<data>.csv` — uma linha por segmento (`segment, timestamp, size_bytes, rtt_ms, rtt_estimated_ms, timeout_ms, throughput_kbps, retransmissions, timeout_occurred, window_size, protocol, simulated_loss`);
 - `recebido_<grupo>_<arquivo>.bin` — o arquivo recebido.
@@ -65,8 +66,8 @@ Com `--drop-chance P`, o cliente descarta cada `DATA` recebido com probabilidade
 ### Gráficos
 
 ```bash
-python graficos.py metrics_grupo12_saw_....csv
-python graficos_comparacao.py metrics_grupo12_gbn_....csv metrics_grupo12_sr_....csv comparacao.png
+python graficos.py metricas/metrics_grupo12_saw_....csv
+python graficos_comparacao.py metricas/metrics_grupo12_gbn_....csv metricas/metrics_grupo12_sr_....csv metricas/comparacao.png
 ```
 
 ### Atalhos (Linux/WSL)

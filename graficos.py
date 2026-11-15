@@ -1,5 +1,6 @@
 # Gera gráficos de RTT e throughput por segmento e o resumo teórico x medido.
-# Uso: python graficos.py metrics_grupo12_saw_20261026_012200.csv [...]
+# Uso: python graficos.py metricas/metrics_grupo12_saw_20261026_012200.csv [...]
+# O PNG é salvo na mesma pasta do CSV.
 import csv
 import sys
 import matplotlib.pyplot as plt

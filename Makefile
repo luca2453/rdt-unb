@@ -3,10 +3,10 @@ SERVER ?= 137.131.178.229
 GROUP ?= grupo12
 FILE ?= small
 WINDOW ?= 4
-DROP_CHANCE ?= 0
+DROP_CHANCE ?= 0.1
 CSV ?=
 
-.PHONY: all help run saw gbn gbn4 gbn8 gbn16 test check syntax graph
+.PHONY: all help run saw gbn gbn4 gbn8 gbn16 test check syntax graph clean
 
 all: help
 
@@ -23,7 +23,8 @@ help:
 	@echo "  make sr16     - executa Selective Repeat com janela 16"
 	@echo "  make test      - executa o teste básico do servidor"
 	@echo "  make check     - verifica a sintaxe dos arquivos Python"
-	@echo "  make graph CSV=metrics_...csv - gera gráficos do CSV"
+	@echo "  make graph CSV=metricas/metrics_...csv - gera gráficos do CSV"
+	@echo "  make clean     - remove arquivos gerados (metricas/, PNGs, caches)"
 	@echo ""
 	@echo "Parâmetros: SERVER=$(SERVER) GROUP=$(GROUP) FILE=$(FILE) WINDOW=$(WINDOW)"
 
@@ -67,6 +68,12 @@ check: syntax
 
 graph:
 ifndef CSV
-	$(error informe o CSV, por exemplo: make graph CSV=metrics_grupo12_saw_20261026_012200.csv)
+	$(error informe o CSV, por exemplo: make graph CSV=metricas/metrics_grupo12_saw_20261026_012200.csv)
 endif
 	$(PYTHON) graficos.py $(CSV)
+
+clean:
+	rm -f metricas/metrics_*.csv metricas/*.png metricas/recebido_*.bin
+	rm -f metrics_*.csv metricas_*.csv metrics_*.png metricas_*.png comparacao*.png recebido_*.bin
+	rm -rf __pycache__
+	@echo "Arquivos gerados removidos."

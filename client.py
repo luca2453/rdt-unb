@@ -1,6 +1,7 @@
 import argparse
 import csv
 import hashlib
+import os
 import socket
 import sys
 import time
@@ -12,6 +13,7 @@ from typing import TypedDict
 SERVER_PORT = 8080
 SOCKET_TIMEOUT_SECONDS = 0.5
 FIN_MAX_ATTEMPTS = 5
+PASTA_SAIDA = "metricas"
 
 
 class MetricaSegmento(TypedDict):
@@ -654,7 +656,8 @@ def main() -> int:
         print("    Servidor confirmou a integridade (DONE|ok=1).")
 
         timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
-        nome_csv = f"metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
+        os.makedirs(PASTA_SAIDA, exist_ok=True)
+        nome_csv = f"{PASTA_SAIDA}/metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
         fieldnames = [
             "segment", "timestamp", "size_bytes", "rtt_ms", "rtt_estimated_ms",
             "timeout_ms", "throughput_kbps", "retransmissions",
@@ -665,7 +668,7 @@ def main() -> int:
             writer.writeheader()
             writer.writerows(metricas)
 
-        nome_saida = f"recebido_{args.group}_{args.file}.bin"
+        nome_saida = f"{PASTA_SAIDA}/recebido_{args.group}_{args.file}.bin"
         with open(nome_saida, "wb") as arquivo_binario:
             arquivo_binario.write(arquivo_final)
 

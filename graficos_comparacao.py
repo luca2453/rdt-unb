@@ -1,5 +1,5 @@
 # Compara GBN e SR (mesma janela, mesmo cenário de perda) segmento a segmento.
-# Uso: python graficos_comparacao.py <csv_gbn> <csv_sr> [saida.png]
+# Uso: python graficos_comparacao.py metricas/<csv_gbn> metricas/<csv_sr> [saida.png]
 #
 # Painel 1: throughput efetivo acumulado ao longo dos segmentos
 #           (bytes entregues em ordem até o segmento i / tempo decorrido até ele)
@@ -7,6 +7,7 @@
 # Também imprime, para a questão (b), quantos segmentos cada protocolo
 # retransmitiu por perda simulada.
 import csv
+import os
 import sys
 from datetime import datetime
 
@@ -36,7 +37,10 @@ def carregar(caminho):
 def main():
     if len(sys.argv) < 3:
         sys.exit("uso: python graficos_comparacao.py <csv_gbn> <csv_sr> [saida.png]")
-    saida = sys.argv[3] if len(sys.argv) > 3 else "comparacao_gbn_sr.png"
+    saida = sys.argv[3] if len(sys.argv) > 3 else "metricas/comparacao_gbn_sr.png"
+    pasta = os.path.dirname(saida)
+    if pasta:
+        os.makedirs(pasta, exist_ok=True)
     fig, (a1, a2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
     print(f"{'protocolo':10s} {'janela':>6s} {'perdas_sim':>10s} {'retx':>6s} {'retx/perda':>10s}")
     for caminho, cor in zip(sys.argv[1:3], ["tab:red", "tab:blue"]):
