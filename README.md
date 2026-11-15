@@ -8,7 +8,7 @@ Cliente do protocolo RDT-UnB com três modos de transferência confiável sobre 
 |---|---|---|
 | Stop-and-Wait | `saw` | 1 |
 | Go-Back-N | `gbn` | 4, 8 ou 16 |
-| Selective Repeat | `sv` | 4, 8 ou 16 |
+| Selective Repeat | `sr` | 4, 8 ou 16 |
 
 ## Estrutura
 
@@ -41,7 +41,7 @@ python rdt_diagnostico.py   # testa o servidor
 
 python client.py --server 137.131.178.229 --group grupo12 --file small --protocol saw --window-size 1
 python client.py --server 137.131.178.229 --group grupo12 --file small --protocol gbn --window-size 16
-python client.py --server 137.131.178.229 --group grupo12 --file small --protocol sv  --window-size 16
+python client.py --server 137.131.178.229 --group grupo12 --file small --protocol sr  --window-size 16
 ```
 
 | Argumento | Obrigatório | Descrição |
@@ -49,7 +49,7 @@ python client.py --server 137.131.178.229 --group grupo12 --file small --protoco
 | `--server` | sim | IP do servidor (porta 8080/UDP) |
 | `--group` | sim | grupo enviado no `HELLO` |
 | `--file` | sim | `small`, `medium` ou `large` |
-| `--protocol` | não | `saw` (padrão), `gbn` ou `sv` |
+| `--protocol` | não | `saw` (padrão), `gbn` ou `sr` |
 | `--window-size` | não | 1, 4, 8 ou 16 |
 | `--drop-chance` | não | perda simulada (ex.: `0.1` = 10%) |
 
@@ -66,7 +66,7 @@ Com `--drop-chance P`, o cliente descarta cada `DATA` recebido com probabilidade
 
 ```bash
 python graficos.py metrics_grupo12_saw_....csv
-python graficos_comparacao.py metrics_grupo12_gbn_....csv metrics_grupo12_sv_....csv comparacao.png
+python graficos_comparacao.py metrics_grupo12_gbn_....csv metrics_grupo12_sr_....csv comparacao.png
 ```
 
 ### Atalhos (Linux/WSL)

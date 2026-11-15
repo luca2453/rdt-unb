@@ -42,3 +42,7 @@ docs/**/build/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Arquivos de documentação
+AGENTS.md
+requisitos.md

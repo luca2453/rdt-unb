@@ -45,7 +45,7 @@ gbn16:
 	$(MAKE) gbn WINDOW=16
 
 sr:
-	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sv --window-size $(WINDOW) --drop-chance $(DROP_CHANCE)
+	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sr --window-size $(WINDOW) --drop-chance $(DROP_CHANCE)
 
 sr4:
 	$(MAKE) sr WINDOW=4
