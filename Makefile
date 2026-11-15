@@ -3,7 +3,10 @@ SERVER ?= 137.131.178.229
 GROUP ?= grupo12
 FILE ?= small
 WINDOW ?= 4
-DROP_CHANCE ?= 0.1
+DROP_CHANCE ?= 0
+TIMEOUT ?= fixed
+ALPHA ?= 0.125
+BETA ?= 0.25
 CSV ?=
 
 .PHONY: all help run saw gbn gbn4 gbn8 gbn16 test check syntax graph clean
@@ -27,6 +30,7 @@ help:
 	@echo "  make clean     - remove arquivos gerados (metricas/, PNGs, caches)"
 	@echo ""
 	@echo "Parâmetros: SERVER=$(SERVER) GROUP=$(GROUP) FILE=$(FILE) WINDOW=$(WINDOW)"
+	@echo "            DROP_CHANCE=$(DROP_CHANCE) TIMEOUT=$(TIMEOUT) ALPHA=$(ALPHA) BETA=$(BETA)"
 
 run: saw
 
@@ -34,7 +38,7 @@ saw:
 	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol saw --window-size 1 --drop-chance $(DROP_CHANCE)
 
 gbn:
-	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol gbn --window-size $(WINDOW) --drop-chance $(DROP_CHANCE)
+	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol gbn --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA)
 
 gbn4:
 	$(MAKE) gbn WINDOW=4
@@ -46,7 +50,7 @@ gbn16:
 	$(MAKE) gbn WINDOW=16
 
 sr:
-	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sr --window-size $(WINDOW) --drop-chance $(DROP_CHANCE)
+	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sr --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA)
 
 sr4:
 	$(MAKE) sr WINDOW=4

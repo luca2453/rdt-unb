@@ -14,6 +14,7 @@ SERVER_PORT = 8080
 SOCKET_TIMEOUT_SECONDS = 0.5
 FIN_MAX_ATTEMPTS = 5
 PASTA_SAIDA = "metricas"
+RTO_MINIMO_MS = 100.0
 
 
 class MetricaSegmento(TypedDict):
@@ -174,10 +175,11 @@ def transferir_gbn(
     timeout_adaptativo: bool = False,
     alpha: float = 0.125,
     beta: float = 0.25,
+    rto_minimo: float = RTO_MINIMO_MS,
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     timeout_atual = (
-        rtt_est + 4.0 * dev_rtt if timeout_adaptativo
+        max(rtt_est + 4.0 * dev_rtt, rto_minimo) if timeout_adaptativo
         else SOCKET_TIMEOUT_SECONDS * 1000
     )
     base = 0
@@ -243,11 +245,12 @@ def transferir_gbn(
                     # Karn: só amostra RTT de segmentos nunca retransmitidos,
                     # pois o RTT de uma retransmissão não isola o atraso real.
                     if timeout_adaptativo and retransmissoes_por_segmento[seq] == 0:
-                        rtt_est, dev_rtt, timeout_atual = (
+                        rtt_est, dev_rtt, novo_timeout = (
                             atualizar_rtt_adaptativo(
                                 rtt_por_segmento[seq], rtt_est, dev_rtt, alpha, beta
                             )
                         )
+                        timeout_atual = max(novo_timeout, rto_minimo)
                     recebido_em[seq] = datetime.now().astimezone().isoformat(
                         timespec="milliseconds"
                     )
@@ -310,10 +313,11 @@ def transferir_sr(
     timeout_adaptativo: bool = False,
     alpha: float = 0.125,
     beta: float = 0.25,
+    rto_minimo: float = RTO_MINIMO_MS,
 ) -> tuple[bytearray, list[MetricaSegmento], int]:
     rtt_est, dev_rtt = inicializar_rtt_adaptativo(rtt_ping)
     timeout_atual = (
-        rtt_est + 4.0 * dev_rtt if timeout_adaptativo
+        max(rtt_est + 4.0 * dev_rtt, rto_minimo) if timeout_adaptativo
         else SOCKET_TIMEOUT_SECONDS * 1000
     )
     base = 0
@@ -403,9 +407,10 @@ def transferir_sr(
             # Karn: só amostra RTT de segmentos nunca retransmitidos,
             # pois o RTT de uma retransmissão não isola o atraso real.
             if timeout_adaptativo and retransmissoes_por_segmento[seq] == 0:
-                rtt_est, dev_rtt, timeout_atual = atualizar_rtt_adaptativo(
+                rtt_est, dev_rtt, novo_timeout = atualizar_rtt_adaptativo(
                     rtt_por_segmento[seq], rtt_est, dev_rtt, alpha, beta
                 )
+                timeout_atual = max(novo_timeout, rto_minimo)
             recebido_em[seq] = datetime.now().astimezone().isoformat(
                 timespec="milliseconds"
             )
@@ -555,6 +560,10 @@ def main() -> int:
         "--beta", type=float, default=0.25,
         help="Peso do EWMA do DevRTT (padrão TCP: 0.25)",
     )
+    parser.add_argument(
+        "--min-rto", type=float, default=RTO_MINIMO_MS,
+        help="Piso do timeout adaptativo em ms (padrão TCP/RFC 6298; 100 ms)",
+    )
     args = parser.parse_args()
 
     servidor = (args.server, SERVER_PORT)
@@ -613,7 +622,7 @@ def main() -> int:
             arquivo_final, metricas, total_retransmissoes = transferir_gbn(
                 sock, servidor, total_segments, args.window_size,
                 args.drop_chance, rtt_ping, timeout_adaptativo,
-                args.alpha, args.beta,
+                args.alpha, args.beta, args.min_rto,
             )
         elif args.protocol == "sr":
             print(
@@ -623,7 +632,7 @@ def main() -> int:
             arquivo_final, metricas, total_retransmissoes = transferir_sr(
                 sock, servidor, total_segments, args.window_size,
                 args.drop_chance, rtt_ping, timeout_adaptativo,
-                args.alpha, args.beta,
+                args.alpha, args.beta, args.min_rto,
             )
 
         else:
@@ -657,7 +666,18 @@ def main() -> int:
 
         timestamp_arquivo = datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs(PASTA_SAIDA, exist_ok=True)
-        nome_csv = f"{PASTA_SAIDA}/metrics_{args.group}_{args.protocol}_{timestamp_arquivo}.csv"
+        drop_pct = round(args.drop_chance * 100)
+        modo_timeout = "adaptativo" if timeout_adaptativo else "fixo"
+        # SAW roda sempre com janela 1; para os deslizantes, a janela faz
+        # parte do nome (gbn16, sr4, sr8, sr16...).
+        protocolo_tag = (
+            args.protocol if args.protocol == "saw"
+            else f"{args.protocol}{args.window_size}"
+        )
+        nome_csv = (
+            f"{PASTA_SAIDA}/metrics_{args.group}_{protocolo_tag}"
+            f"_{modo_timeout}_drop{drop_pct}_{timestamp_arquivo}.csv"
+        )
         fieldnames = [
             "segment", "timestamp", "size_bytes", "rtt_ms", "rtt_estimated_ms",
             "timeout_ms", "throughput_kbps", "retransmissions",
@@ -667,6 +687,12 @@ def main() -> int:
             writer = csv.DictWriter(arquivo_csv, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(metricas)
+
+        try:
+            import graficos
+            graficos.gerar(nome_csv)
+        except Exception as erro:
+            print(f"    [!] Não foi possível gerar o gráfico do CSV: {erro}")
 
         nome_saida = f"{PASTA_SAIDA}/recebido_{args.group}_{args.file}.bin"
         with open(nome_saida, "wb") as arquivo_binario:

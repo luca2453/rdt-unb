@@ -56,8 +56,9 @@ python client.py --server 137.131.178.229 --group grupo12 --file small --protoco
 
 Ao final o cliente valida o MD5 e gera, dentro da pasta `metricas/`:
 
-- `metrics_<grupo>_<protocolo>_<data>.csv` — uma linha por segmento (`segment, timestamp, size_bytes, rtt_ms, rtt_estimated_ms, timeout_ms, throughput_kbps, retransmissions, timeout_occurred, window_size, protocol, simulated_loss`);
-- `recebido_<grupo>_<arquivo>.bin` — o arquivo recebido.
+- `metrics_<grupo>_<protocolo><janela>_<fixo|adaptativo>_drop<%>_<data>.csv` (ex.: `metrics_grupo12_sr16_fixo_drop10_...csv`; SAW fica `saw`, pois usa janela 1) — uma linha por segmento (`segment, timestamp, size_bytes, rtt_ms, rtt_estimated_ms, timeout_ms, throughput_kbps, retransmissions, timeout_occurred, window_size, protocol, simulated_loss`);
+- `recebido_<grupo>_<arquivo>.bin` — o arquivo recebido;
+- `metrics_...png` — gráfico de RTT e throughput do CSV, gerado automaticamente (requer `matplotlib`).
 
 ### Perda simulada
 
