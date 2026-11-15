@@ -5,6 +5,7 @@ FILE ?= small
 WINDOW ?= 4
 DROP_CHANCE ?= 0
 TIMEOUT ?= fixed
+MIN_RTO ?= 100
 ALPHA ?= 0.125
 BETA ?= 0.25
 CSV ?=
@@ -38,7 +39,7 @@ saw:
 	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol saw --window-size 1 --drop-chance $(DROP_CHANCE)
 
 gbn:
-	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol gbn --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA)
+	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol gbn --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA) --min-rto $(MIN_RTO)
 
 gbn4:
 	$(MAKE) gbn WINDOW=4
@@ -50,7 +51,7 @@ gbn16:
 	$(MAKE) gbn WINDOW=16
 
 sr:
-	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sr --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA)
+	$(PYTHON) client.py --server $(SERVER) --group $(GROUP) --file $(FILE) --protocol sr --window-size $(WINDOW) --drop-chance $(DROP_CHANCE) --timeout $(TIMEOUT) --alpha $(ALPHA) --beta $(BETA) --min-rto $(MIN_RTO)
 
 sr4:
 	$(MAKE) sr WINDOW=4

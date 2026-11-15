@@ -15,6 +15,7 @@ def gerar(caminho):
     linhas = ler(caminho)
     seg = [int(l["segment"]) for l in linhas]
     rtt = [float(l["rtt_ms"]) for l in linhas]
+    tmo = [float(l["timeout_ms"]) for l in linhas]
     sizes = [int(l["size_bytes"]) for l in linhas]
     bytes_tot = sum(sizes)
     seg_size = max(sizes)
@@ -57,6 +58,12 @@ def gerar(caminho):
 
     fig, (a1, a2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
     a1.plot(seg, rtt, lw=0.7)
+    # Linha do RTO ao longo da transferência: só faz sentido junto ao RTT
+    # quando é da mesma ordem de grandeza (modo adaptativo); com timeout
+    # fixo (500 ms) ela distorceria a escala do painel.
+    if max(tmo) < 10 * rtt_med:
+        a1.plot(seg, tmo, lw=1.0, color="tab:red",
+                label=f"timeout adaptativo ({min(tmo):.0f}–{max(tmo):.0f} ms)")
     a1.axhline(rtt_med, ls="--", color="gray", label=f"média {rtt_med:.1f} ms")
     a1.set_ylabel("RTT (ms)"); a1.legend(); a1.grid(alpha=.3)
     # Oculta o transiente de aquecimento da média móvel (~4% iniciais):
