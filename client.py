@@ -223,27 +223,21 @@ def transferir_gbn(
                     dados, _ = sock.recvfrom(65507)
                 except socket.timeout:
                     if timeout_adaptativo:
-                        rtt_est *= 2
-                        timeout_atual *= 2
-                        dev_rtt = 0
-                        rtt_est = min(RTO_MAX, rtt_est)
-                        timeout_atual = min(RTO_MAX, timeout_atual)
+                        # Backoff de RTO (RFC 6298): dobra apenas o timeout,
+                        # mantendo o estimador EWMA intacto; o Karn's
+                        # algorithm já impede que retransmissões o contaminem.
+                        timeout_atual = min(timeout_atual * 2, RTO_MAX)
                     break
 
                 data = receber_data(dados)
                 if data is None:
                     continue
                 seq, payload = data
-                # Perda simulada: descarta o DATA recebido com probabilidade P
+                # Perda simulada: descarta o DATA recebido com probabilidade P.
+                # Sem backoff aqui: nenhum timeout ocorreu; o atraso de
+                # reentrega será coberto pelo timeout real do segmento.
                 if random.random() < drop_chance:
                     perdas_simuladas[seq] += 1
-
-                    if timeout_adaptativo:
-                        rtt_est *= 2
-                        timeout_atual *= 2
-                        dev_rtt = 0
-                        rtt_est = min(RTO_MAX, rtt_est)
-                        timeout_atual = min(RTO_MAX, timeout_atual)
                     continue
                 if not base <= seq < fim_janela:
                     continue
@@ -400,27 +394,21 @@ def transferir_sr(
             enviado_uma_vez.add(oldest_transmition_seq)
 
             if timeout_adaptativo:
-                rtt_est *= 2
-                timeout_atual *= 2
-                dev_rtt = 0
-                rtt_est = min(RTO_MAX, rtt_est)
-                timeout_atual = min(RTO_MAX, timeout_atual)
+                # Backoff de RTO (RFC 6298): dobra apenas o timeout, mantendo
+                # o estimador EWMA intacto; o Karn's algorithm já impede que
+                # retransmissões o contaminem.
+                timeout_atual = min(timeout_atual * 2, RTO_MAX)
             continue
 
         data = receber_data(dados)
         if data is None:
             continue
         seq, payload = data
-        # Perda simulada: descarta o DATA recebido com probabilidade P
+        # Perda simulada: descarta o DATA recebido com probabilidade P.
+        # Sem backoff aqui: nenhum timeout ocorreu; o atraso de reentrega
+        # será coberto pelo timeout real do segmento.
         if random.random() < drop_chance:
             perdas_simuladas[seq] += 1
-
-            if timeout_adaptativo:
-                rtt_est *= 2
-                timeout_atual *= 2
-                dev_rtt = 0
-                rtt_est = min(RTO_MAX, rtt_est)
-                timeout_atual = min(RTO_MAX, timeout_atual)
             continue
         if seq < base:
             continue
