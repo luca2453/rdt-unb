@@ -15,7 +15,7 @@ SOCKET_TIMEOUT_SECONDS = 0.5
 FIN_MAX_ATTEMPTS = 5
 PASTA_SAIDA = "metricas"
 RTO_MINIMO_MS = 168.0
-
+RTO_MAX = 1000.0
 
 class MetricaSegmento(TypedDict):
     segment: int
@@ -222,6 +222,12 @@ def transferir_gbn(
                 try:
                     dados, _ = sock.recvfrom(65507)
                 except socket.timeout:
+                    if timeout_adaptativo:
+                        rtt_est *= 2
+                        timeout_atual *= 2
+                        dev_rtt = 0
+                        rtt_est = min(RTO_MAX, rtt_est)
+                        timeout_atual = min(RTO_MAX, timeout_atual)
                     break
 
                 data = receber_data(dados)
@@ -231,6 +237,13 @@ def transferir_gbn(
                 # Perda simulada: descarta o DATA recebido com probabilidade P
                 if random.random() < drop_chance:
                     perdas_simuladas[seq] += 1
+
+                    if timeout_adaptativo:
+                        rtt_est *= 2
+                        timeout_atual *= 2
+                        dev_rtt = 0
+                        rtt_est = min(RTO_MAX, rtt_est)
+                        timeout_atual = min(RTO_MAX, timeout_atual)
                     continue
                 if not base <= seq < fim_janela:
                     continue
@@ -251,6 +264,7 @@ def transferir_gbn(
                             )
                         )
                         timeout_atual = max(novo_timeout, rto_minimo)
+                        timeout_atual = min(timeout_atual, RTO_MAX)
                     recebido_em[seq] = datetime.now().astimezone().isoformat(
                         timespec="milliseconds"
                     )
@@ -384,6 +398,13 @@ def transferir_sr(
             sock.sendto(f"REQ|seq={oldest_transmition_seq}".encode("utf-8"), servidor)
             enviados_em[oldest_transmition_seq] = time.perf_counter()
             enviado_uma_vez.add(oldest_transmition_seq)
+
+            if timeout_adaptativo:
+                rtt_est *= 2
+                timeout_atual *= 2
+                dev_rtt = 0
+                rtt_est = min(RTO_MAX, rtt_est)
+                timeout_atual = min(RTO_MAX, timeout_atual)
             continue
 
         data = receber_data(dados)
@@ -393,6 +414,13 @@ def transferir_sr(
         # Perda simulada: descarta o DATA recebido com probabilidade P
         if random.random() < drop_chance:
             perdas_simuladas[seq] += 1
+
+            if timeout_adaptativo:
+                rtt_est *= 2
+                timeout_atual *= 2
+                dev_rtt = 0
+                rtt_est = min(RTO_MAX, rtt_est)
+                timeout_atual = min(RTO_MAX, timeout_atual)
             continue
         if seq < base:
             continue
@@ -411,6 +439,7 @@ def transferir_sr(
                     rtt_por_segmento[seq], rtt_est, dev_rtt, alpha, beta
                 )
                 timeout_atual = max(novo_timeout, rto_minimo)
+                timeout_atual = min(timeout_atual, RTO_MAX)
             recebido_em[seq] = datetime.now().astimezone().isoformat(
                 timespec="milliseconds"
             )
