@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 def ler(caminho):
     with open(caminho, encoding="utf-8") as f:
@@ -46,9 +47,13 @@ def gerar(caminho):
 
     if max(tmo) < 10 * rtt_med:
         a1.plot(seg, tmo, lw=1.0, color="tab:red",
-                label=f"timeout adaptativo ({min(tmo):.0f}–{max(tmo):.0f} ms)")
+                label=f"timeout ({min(tmo):.0f}–{max(tmo):.0f} ms)")
     a1.axhline(rtt_med, ls="--", color="gray", label=f"média {rtt_med:.1f} ms")
     a1.set_ylabel("RTT (ms)"); a1.legend(); a1.grid(alpha=.3)
+
+    a1.set_yscale('log', base=2)
+    a1.yaxis.set_major_formatter(ticker.ScalarFormatter())
+
     a2.plot(seg, inst, lw=0.7, color="tab:orange")
     a2.set_ylabel("Throughput por segmento (kbps)"); a2.set_xlabel("Segmento (seq)")
     # Escala pelo throughput POR SEGMENTO (size*8/rtt ≈ seg_size*8/RTT); o
@@ -56,6 +61,7 @@ def gerar(caminho):
     # linhas de referência agregadas só entram se caírem na escala do eixo.
     lo = min(inst)
     hi = max(inst)
+
     centro = (lo + hi) / 2
     meia_faixa = max((hi - lo) / 2, 0.2 * st.median(inst))
     a2.set_ylim(max(0, centro - 1.15 * meia_faixa), centro + 1.15 * meia_faixa)
