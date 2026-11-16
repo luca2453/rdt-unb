@@ -34,6 +34,24 @@
 \begin{document}
 \capa
 
+\begin{resumo}
+Este relatório conclui o projeto RDT-UnB (\textit{Reliable Data Transfer over
+UDP}) apresentando a etapa de RTT adaptativo: o timeout deixa de ser fixo em
+\SI{500}{\milli\second} e passa a ser calculado por segmento com a fórmula do
+TCP ($RTT_{est} + 4 \cdot DevRTT$, estimada por EWMA com $\alpha = 0.125$ e
+$\beta = 0.25$), incluindo o Karn's algorithm, piso de RTO configurável
+(\SI{100}{\milli\second}) e backoff da RFC 6298 (dobra apenas o RTO, limitado a
+\SI{1}{\second}). Com a mesma sequência de perdas (mesma seed), o SR com janela
+16 e timeout adaptativo atingiu \SI{1788.77}{\kilo\bit\per\second} contra
+\SI{1139.13}{\kilo\bit\per\second} do fixo a \SI{5}{\percent} de perda
+(\SI{57}{\percent} de ganho) e \SI{1525.33}{\kilo\bit\per\second} contra
+\SI{704.72}{\kilo\bit\per\second} a \SI{10}{\percent} (\SI{116}{\percent}); sem
+perdas, os dois modos empatam. No comparativo geral, o SR-16 adaptativo foi o
+melhor protocolo do projeto (\SI{2089.87}{\kilo\bit\per\second} no arquivo
+\textit{large}). Todo o código, os CSVs de métricas e este relatório estão no
+repositório \url{https://github.com/luca2453/rdt-unb}.
+\end{resumo}
+
 % RELATÓRIO FINAL: 
 %
 % Relatório final em PDF (máximo 15 páginas), contendo a evolução completa do projeto,  
