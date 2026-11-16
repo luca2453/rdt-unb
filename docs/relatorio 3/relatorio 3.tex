@@ -83,18 +83,6 @@ Este relatório está dividido em 4 secções principais: na implementação é 
 na comparação, tem-se dados com os procolos com e sem timeout fixo; na análise Wireshark, tem-se dados coletados da ferramenta;
 e por último na visão integrada, tem-se dados consolidativos.
 
-Ao longo das entregas, algumas dificuldades moldaram a implementação. Na primeira,
-o servidor da disciplina ficou indisponível no fim de semana do prazo, e o grupo
-montou um servidor compatível com o protocolo para validar o cliente. Na segunda,
-o primeiro SR registrava as retransmissões com o rótulo do GBN e o CSV ainda não
-separava a perda simulada da perda real; isso foi corrigido com a coluna
-\texttt{simulated\_loss}. Na terceira, a primeira versão do timeout adaptativo
-entrava em um ciclo de retransmissões falsas: quando o timeout inicial ficava
-menor que o RTT real, todo segmento era retransmitido e, como amostras de
-segmentos retransmitidos são descartadas, o estimador nunca recebia um valor
-válido para corrigir o timeout. A solução foi adotar o \textit{backoff}
-exponencial do TCP, descrito na Seção~\ref{sec:impl_rtt}.
-
 \section{RTT Adaptativo - Implementação}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,30 +134,25 @@ mais rápido o protocolo se adapta as mudanças. Esses valores tenderam a ter o 
 não costumam mudar muito durante os testes.
 
 \label{sec:impl_rtt}
-O timeout adaptativo foi aplicado aos três protocolos e é escolhido na linha de
-comando com \texttt{-{}-timeout fixo|adaptativo}; os pesos são definidos por
+O timeout adaptativo foi aplicado ao GBN e SR e é escolhido na linha de
+comando com \texttt{-{}-timeout fixed|adaptive}; os pesos são definidos por
 \texttt{-{}-alpha} e \texttt{-{}-beta}. Assim, a mesma versão do cliente gera os
 dois cenários comparados na Seção~\ref{sec:fixo_adapt}, e a única diferença entre
-eles é a regra do timeout. Três detalhes da implementação merecem destaque:
+eles é a regra do timeout. Dois detalhes da implementação merecem destaque:
 
 \begin{itemize}
-  \item \textbf{Valor inicial.} Antes da transferência o cliente envia um
-  \texttt{PING}; o RTT dessa troca inicializa $RTT_{est}$, e $DevRTT$ começa em
-  metade desse valor, como recomenda o TCP para a primeira amostra.
-  \item \textbf{Algoritmo de Karn.} Quando um segmento é retransmitido, não é
-  possível saber se o \texttt{DATA} recebido responde ao primeiro \texttt{REQ} ou
-  ao segundo. Por isso, só são usadas no EWMA as amostras de segmentos que
-  chegaram na primeira tentativa~[1, Seç.~3.5.3].
+	\item \textbf{Valor inicial.} É adotado um valor inicial para o $RTT_{est}$ baseado no timeout fixo
+		utilizado de \SI{500}{\milli\second}. O $DevRTT$ é inicado para metade disto.
   \item \textbf{Backoff exponencial.} A cada \textit{timeout} o valor é dobrado
-  (limitado a \SI{4}{\second}) e volta a ser calculado pela fórmula assim que
+  (limitado a \SI{1}{\second}) e volta a ser calculado pela fórmula assim que
   chega uma amostra válida. Sem isso, um timeout subestimado nunca se corrige,
-  porque todas as amostras seriam descartadas pelo algoritmo de Karn.
+  porque todas as amostras seriam descartadas.
 \end{itemize}
 
 Todo segmento registra no CSV o RTT medido (\texttt{rtt\_ms}), o RTT estimado
 naquele instante (\texttt{rtt\_estimated\_ms}) e o timeout em vigor quando ele foi
 pedido (\texttt{timeout\_ms}), o que permite reconstruir a evolução do estimador
-segmento a segmento (Figura~\ref{fig:rtt_est}).
+segmento a segmento.
 
 \section{Comparação entre timeout fixo e adaptativo}
 \label{sec:fixo_adapt}
