@@ -11,10 +11,10 @@ from typing import TypedDict
 
 
 SERVER_PORT = 8080
-SOCKET_TIMEOUT_SECONDS = 0.5
+SOCKET_TIMEOUT_SECONDS = 0.168
 FIN_MAX_ATTEMPTS = 5
 PASTA_SAIDA = "metricas"
-RTO_MINIMO_MS = 168.0
+RTO_MINIMO_MS = 100.0
 RTO_MAX = 1000.0
 
 class MetricaSegmento(TypedDict):
@@ -599,7 +599,7 @@ def main() -> int:
                 f"Timeout adaptativo: ativo (alpha={args.alpha}, beta={args.beta})\n"
             )
         else:
-            print(f"Timeout adaptativo: desativado (fixo de 500 ms)\n")
+            print(f"Timeout adaptativo: desativado (fixo de 168 ms)\n")
 
         rtt_ping, _ = ping(sock, servidor)
         print("[1] PING")

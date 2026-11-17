@@ -59,11 +59,11 @@ def gerar(caminho):
     a1.plot(seg, rtt, lw=0.7)
     # Linha do RTO ao longo da transferência: só faz sentido junto ao RTT
     # quando é da mesma ordem de grandeza (modo adaptativo); com timeout
-    # fixo (500 ms) ela distorceria a escala do painel.
+    # fixo (168 ms) ela distorceria a escala do painel.
 
     # Plota quando o RTO é da escala do RTT (adaptativo sem spikes) ou quando
     # ele varia (adaptativo com backoff: os picos até o teto são justamente o
-    # que se quer ver). Só omite no timeout fixo (constante em 500 ms).
+    # que se quer ver). Só omite no timeout fixo (constante em 168 ms).
     if min(tmo) != max(tmo) or max(tmo) < 10 * rtt_med:
         teto = max(max(rtt), rtt_med) * 1.5
         a1.plot(seg, tmo, lw=1.0, color="tab:red",

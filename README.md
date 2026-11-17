@@ -40,10 +40,10 @@ No Windows (PowerShell): `python -m venv .venv` e `.\.venv\Scripts\Activate.ps1`
 ```bash
 python rdt_diagnostico.py   # testa o servidor
 
-# Stop-and-Wait (sem timeout adaptativo: janela 1, timeout fixo de 500 ms)
+# Stop-and-Wait (sem timeout adaptativo: janela 1, timeout fixo de 168 ms)
 python client.py --server 137.131.178.229 --group grupo12 --file small --protocol saw --window-size 1
 
-# GBN com janela 16 e timeout fixo de 500 ms (padrão)
+# GBN com janela 16 e timeout fixo de 168 ms (padrão)
 python client.py --server 137.131.178.229 --group grupo12 --file small --protocol gbn --window-size 16
 
 # SR com janela 16, timeout adaptativo e 5% de perda simulada
@@ -55,7 +55,7 @@ python client.py --server 137.131.178.229 --group grupo12 --file small --protoco
     --timeout adaptive --alpha 0.125 --beta 0.25 --min-rto 100
 ```
 
-Por padrão o cliente roda com `--timeout fixed` (500 ms). Use `--timeout adaptive` para ativar o estimador EWMA (detalhes na seção abaixo). SAW ignora `--timeout`: é sempre fixo.
+Por padrão o cliente roda com `--timeout fixed` (168 ms). Use `--timeout adaptive` para ativar o estimador EWMA (detalhes na seção abaixo). SAW ignora `--timeout`: é sempre fixo.
 
 | Argumento | Obrigatório | Descrição |
 |---|---|---|
@@ -65,7 +65,7 @@ Por padrão o cliente roda com `--timeout fixed` (500 ms). Use `--timeout adapti
 | `--protocol` | não | `saw` (padrão), `gbn` ou `sr` |
 | `--window-size` | não | 1, 4, 8 ou 16 |
 | `--drop-chance` | não | perda simulada (ex.: `0.1` = 10%) |
-| `--timeout` | não | `fixed` (padrão, 500 ms) ou `adaptive` |
+| `--timeout` | não | `fixed` (padrão, 168 ms) ou `adaptive` |
 | `--alpha` | não | peso do EWMA do RTT estimado (padrão TCP: 0.125) |
 | `--beta` | não | peso do EWMA do DevRTT (padrão TCP: 0.25) |
 | `--min-rto` | não | piso do RTO adaptativo em ms (padrão: 100, RFC 6298) |

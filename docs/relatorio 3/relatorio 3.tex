@@ -37,7 +37,7 @@
 \begin{resumo}
 Este relatório conclui o projeto RDT-UnB (\textit{Reliable Data Transfer over
 UDP}) apresentando a etapa de RTT adaptativo: o timeout deixa de ser fixo em
-\SI{500}{\milli\second} e passa a ser calculado por segmento com a fórmula do
+\SI{168}{\milli\second} e passa a ser calculado por segmento com a fórmula do
 TCP ($RTT_{est} + 4 \cdot DevRTT$, estimada por EWMA com $\alpha = 0.125$ e
 $\beta = 0.25$), incluindo o Karn's algorithm, piso de RTO configurável
 (\SI{100}{\milli\second}) e backoff da RFC 6298 (dobra apenas o RTO, limitado a
@@ -183,7 +183,7 @@ segmento a segmento.
 \section{Comparação entre timeout fixo e adaptativo}
 \label{sec:fixo_adapt}
 Para isolar o efeito do timeout, o mesmo protocolo (SR com janela 16) foi
-executado no arquivo \textit{large} com timeout fixo de \SI{500}{\milli\second} e
+executado no arquivo \textit{large} com timeout fixo de \SI{168}{\milli\second} e
 com timeout adaptativo, sob 5\,\% e 10\,\% de perda simulada e com a mesma
 \textit{seed}. Assim, os dois casos sofrem exatamente a mesma sequência de
 descartes, e as diferenças da Tabela~\ref{tab:fixo_adapt} se devem apenas à regra
@@ -208,9 +208,9 @@ Perda & Timeout & Retransmissões & Tempo total (s) & Throughput médio (kbps) \
 
 Com a mesma quantidade de perdas (mesma seed), o ganho do adaptativo vem
 exclusivamente de quanto tempo se espera a cada perda: com timeout fixo de
-\SI{500}{\milli\second}, cada segmento perdido custa meio segundo de janela
-parada; no adaptativo, a retransmissão parte do piso de \SI{100}{\milli\second}
-(ou pouco acima, com os picos de backoff), cerca de 5 vezes menos. O efeito
+\SI{168}{\milli\second}, cada segmento perdido custa \SI{168}{\milli\second} de
+janela parada; no adaptativo, a retransmissão parte do piso de \SI{100}{\milli\second}
+(ou pouco acima, com os picos de backoff), cerca de 60\,\% do fixo. O efeito
 cresce com a taxa de perda: a \SI{5}{\percent} o adaptativo foi
 \SI{57}{\percent} mais rápido e a \SI{10}{\percent}, \SI{116}{\percent}.
 
@@ -218,7 +218,7 @@ cresce com a taxa de perda: a \SI{5}{\percent} o adaptativo foi
 \centering
 \includegraphics[width=0.85\linewidth]{imagens/sr16_fixo_10.png}
 \caption{SR-16, arquivo \textit{large}, 10\,\% de perda, timeout fixo
-(\SI{500}{\milli\second}): RTT e \textit{throughput} agregado (média móvel de
+(\SI{168}{\milli\second}): RTT e \textit{throughput} agregado (média móvel de
 3~s). RTT médio de 34,9~ms; 2360 retransmissões em 119~s.}
 \label{fig:sr_fixo10}
 \end{figure}
@@ -237,14 +237,14 @@ médio de 30,6~ms; 2357 retransmissões em 55~s.}
 A Figura~\ref{fig:sr_adapt10} ilustra a vantagem: cada pico vermelho do RTO
 marcado no painel de RTT é um timeout, recuperado em ~\SI{100}{\milli\second}
 (piso) ou até \SI{400}{\milli\second} (após backoffs consecutivos) — enquanto o
-modo fixo da Figura~\ref{fig:sr_fixo10} paga \SI{500}{\milli\second} por cada
+modo fixo da Figura~\ref{fig:sr_fixo10} paga \SI{168}{\milli\second} por cada
 um desses eventos. Mesmo com o mesmo número de perdas, o adaptativo mantém a
 janela em voo por muito mais tempo.
 
 \paragraph{Quando o adaptativo vale mais a pena?} A vantagem cresce com a taxa
 de perda: com a mesma quantidade de retransmissões, cada perda custa ao
 adaptativo o RTO corrente (piso de \SI{100}{\milli\second} na prática, com
-picos de backoff em rajadas) e ao fixo os \SI{500}{\milli\second} cheios — nos
+picos de backoff em rajadas) e ao fixo os \SI{168}{\milli\second} cheios — nos
 dados da Tabela~\ref{tab:fixo_adapt}, \SI{57}{\percent} de ganho a
 \SI{5}{\percent} de perda e \SI{116}{\percent} a \SI{10}{\percent}. Ele também
 é a única opção segura quando o RTT muda durante a transferência (por exemplo,
@@ -379,7 +379,7 @@ da sessão (31,2~ms contra 39~ms), e não a regra do timeout, que nunca estourou
 em nenhuma das duas. Sob perda, a vantagem do adaptativo é real e grande
 (Seção~\ref{sec:fixo_adapt}): \SI{57}{\percent} a \SI{5}{\percent} de perda e
 \SI{116}{\percent} a \SI{10}{\percent}. Sem perdas, o fixo é suficiente; com
-perdas, ele desperdiça \SI{500}{\milli\second} por evento, contra ~\SI{100}{\milli\second}
+perdas, ele desperdiça \SI{168}{\milli\second} por evento, contra ~\SI{100}{\milli\second}
 do adaptativo.
 
 
